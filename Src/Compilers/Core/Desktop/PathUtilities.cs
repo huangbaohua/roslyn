@@ -144,6 +144,8 @@ namespace Roslyn.Utilities
         /// </summary>
         private static bool IsDriveRootedAbsolutePath(string path)
         {
+            if (path.Length > 1 && path[0] == '/')
+                return true;
             return path.Length >= 3 && path[1] == VolumeSeparatorChar && IsDirectorySeparator(path[2]);
         }
 
