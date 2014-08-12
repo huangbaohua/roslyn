@@ -1,10 +1,6 @@
 ﻿// Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
-using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -28,6 +24,11 @@ namespace Microsoft.CodeAnalysis.CSharp
     {
         private readonly SynthesizedFieldSymbolBase field;
 
+        public CapturedToFrameSymbolReplacement(SynthesizedFieldSymbolBase field)
+        {
+            this.field = field;
+        }
+
         internal override SynthesizedFieldSymbolBase HoistedField
         {
             get { return field; }
@@ -38,11 +39,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             var frame = makeFrame(this.field.ContainingType);
             var field = this.field.AsMember((NamedTypeSymbol)frame.Type);
             return new BoundFieldAccess(node, frame, field, default(ConstantValue));
-        }
-
-        public CapturedToFrameSymbolReplacement(SynthesizedFieldSymbolBase field)
-        {
-            this.field = field;
         }
     }
 

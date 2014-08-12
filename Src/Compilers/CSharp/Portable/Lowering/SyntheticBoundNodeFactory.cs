@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Cci;
 using Microsoft.CodeAnalysis.CSharp.Emit;
@@ -119,7 +120,14 @@ namespace Microsoft.CodeAnalysis.CSharp
             if ((object)CurrentClass != null)
             {
                 Debug.Assert((object)TopLevelMethod == null || TopLevelMethod.ContainingType == CurrentClass);
-                Debug.Assert((object)CurrentMethod == null || CurrentMethod.ContainingType == CurrentClass);
+
+                // In EE scenarios, lambdas are considered to be contained by the user-defined methods,
+                // rather than the EE-defined methods for which we are generating bound nodes.  This is
+                // because the containing symbols are used to determine the type of the "this" parameter,
+                // which we need to the user-defined types.
+                Debug.Assert((object)CurrentMethod == null || 
+                    CurrentMethod.MethodKind == MethodKind.AnonymousFunction || 
+                    CurrentMethod.ContainingType == CurrentClass);
             }
         }
 
@@ -373,10 +381,29 @@ namespace Microsoft.CodeAnalysis.CSharp
             CurrentMethod = null;
         }
 
-        public LocalSymbol SynthesizedLocal(TypeSymbol type, CSharpSyntaxNode syntax = null, bool isPinned = false, RefKind refKind = RefKind.None, SynthesizedLocalKind kind = SynthesizedLocalKind.LoweringTemp)
+#if DEBUG
+        public LocalSymbol SynthesizedLocal(
+            TypeSymbol type, 
+            CSharpSyntaxNode syntax = null,
+            bool isPinned = false,
+            RefKind refKind = RefKind.None, 
+            SynthesizedLocalKind kind = SynthesizedLocalKind.LoweringTemp, 
+            [CallerLineNumber]int createdAtLineNumber = 0, 
+            [CallerFilePath]string createdAtFilePath = null)
+        {
+            return new SynthesizedLocal(CurrentMethod, type, kind, syntax, isPinned, refKind, createdAtLineNumber, createdAtFilePath);
+        }
+#else
+        public LocalSymbol SynthesizedLocal(
+            TypeSymbol type,
+            CSharpSyntaxNode syntax = null,
+            bool isPinned = false,
+            RefKind refKind = RefKind.None,
+            SynthesizedLocalKind kind = SynthesizedLocalKind.LoweringTemp)
         {
             return new SynthesizedLocal(CurrentMethod, type, kind, syntax, isPinned, refKind);
         }
+#endif
 
         public ParameterSymbol SynthesizedParameter(TypeSymbol type, string name, MethodSymbol container = null, int ordinal = 0)
         {
@@ -1028,7 +1055,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Takes an expression and returns the bound local expression "temp" 
         /// and the bound assignment expression "temp = expr".
         /// </summary>
-        public BoundLocal StoreToTemp(BoundExpression argument, out BoundAssignmentOperator store, RefKind refKind = RefKind.None, SynthesizedLocalKind kind = SynthesizedLocalKind.LoweringTemp)
+        public BoundLocal StoreToTemp(
+            BoundExpression argument,
+            out BoundAssignmentOperator store,
+            RefKind refKind = RefKind.None, 
+            SynthesizedLocalKind kind = SynthesizedLocalKind.LoweringTemp
+#if DEBUG
+            , [CallerLineNumber]int callerLineNumber = 0
+            , [CallerFilePath]string callerFilePath = null
+#endif
+            )
         {
             MethodSymbol containingMethod = this.CurrentMethod;
             var syntax = argument.Syntax;
@@ -1036,7 +1072,17 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             var local = new BoundLocal(
                 syntax,
-                new SynthesizedLocal(containingMethod, type, kind, syntax: kind.IsLongLived() ? syntax : null, refKind: refKind),
+                new SynthesizedLocal(
+                    containingMethod,
+                    type, 
+                    kind,
+#if DEBUG
+                    createdAtLineNumber: callerLineNumber,
+                    createdAtFilePath: callerFilePath,
+#endif
+                    syntaxOpt: kind.IsLongLived() ? syntax : null,
+                    isPinned: false,
+                    refKind: refKind),
                 null,
                 type);
 

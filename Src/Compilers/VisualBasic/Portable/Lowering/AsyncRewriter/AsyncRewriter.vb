@@ -14,14 +14,14 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
     Partial Friend NotInheritable Class AsyncRewriter
-        Inherits StateMachineRewriter(Of AsyncStateMachineTypeSymbol, CapturedSymbolOrExpression)
+        Inherits StateMachineRewriter(Of AsyncStateMachine, CapturedSymbolOrExpression)
 
         Private _builderField As FieldSymbol
         Private ReadOnly _binder As Binder
         Private ReadOnly _asyncMethodKind As AsyncMethodKind
         Private ReadOnly _builderType As NamedTypeSymbol
         Private ReadOnly _resultType As TypeSymbol
-        Private ReadOnly _stateMachineType As AsyncStateMachineTypeSymbol
+        Private ReadOnly _stateMachineType As AsyncStateMachine
 
         Private lastExpressionCaptureNumber As Integer = 0
 
@@ -30,12 +30,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                        asyncKind As AsyncMethodKind,
                        compilationState As TypeCompilationState,
                        diagnostics As DiagnosticBag,
-                       generateDebugInfo As boolean)
+                       generateDebugInfo As Boolean)
 
             MyBase.New(body, method, compilationState, diagnostics, generateDebugInfo)
 
             Me._binder = CreateMethodBinder(method)
-            Me._stateMachineType = DirectCast(Me.Method.GetAsyncStateMachineType(), AsyncStateMachineTypeSymbol)
+            Me._stateMachineType = DirectCast(Me.Method.GetAsyncStateMachineType(), AsyncStateMachine)
 
             Debug.Assert(asyncKind <> AsyncMethodKind.None)
             Debug.Assert(asyncKind = GetAsyncMethodKind(method))
@@ -61,12 +61,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Debug.Assert(Me._stateMachineType IsNot Nothing)
         End Sub
 
-        Friend Shared Function CreateAsyncStateMachineTypeSymbol(method As MethodSymbol,
+        Friend Shared Function CreateAsyncStateMachine(method As MethodSymbol,
                                                                  typeIndex As Integer,
+                                                       typeKind As TypeKind,
                                                                  valueTypeSymbol As NamedTypeSymbol,
                                                                  iAsyncStateMachine As NamedTypeSymbol) As NamedTypeSymbol
 
-            Return New AsyncStateMachineTypeSymbol(method, typeIndex, valueTypeSymbol, iAsyncStateMachine)
+            Return New AsyncStateMachine(method, typeIndex, typeKind, valueTypeSymbol, iAsyncStateMachine)
         End Function
 
         Private Shared Function CreateMethodBinder(method As MethodSymbol) As Binder
@@ -80,7 +81,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' For all other symbols we assume that it should be a synchesized method 
             ' placed inside source named type of in one of it's nested types
-            Debug.Assert(TypeOf method Is LambdaRewriter.SynthesizedLambdaMethod)
+            Debug.Assert(TypeOf method Is SynthesizedLambdaMethod)
             Dim containingType As NamedTypeSymbol = method.ContainingType
             While containingType IsNot Nothing
                 Dim sourceNamedType = TryCast(containingType, SourceNamedTypeSymbol)
@@ -119,7 +120,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
-        Protected Overrides ReadOnly Property StateMachineClass As AsyncStateMachineTypeSymbol
+        Protected Overrides ReadOnly Property StateMachineClass As AsyncStateMachine
             Get
                 Return Me._stateMachineType
             End Get
@@ -132,14 +133,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                  method As MethodSymbol,
                                                  compilationState As TypeCompilationState,
                                                  diagnostics As DiagnosticBag,
-                                                 generateDebugInfo As boolean) As BoundBlock
+                                                 generateDebugInfo As Boolean) As BoundBlock
 
             If body.HasErrors Then
                 Return body
             End If
 
             Dim asyncMethodKind As AsyncMethodKind = GetAsyncMethodKind(method)
-            If asyncMethodKind = asyncMethodKind.None Then
+            If asyncMethodKind = AsyncMethodKind.None Then
                 Return body
             End If
 
@@ -155,10 +156,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Protected Overrides Sub GenerateMethodImplementations()
             ' Add IAsyncStateMachine.MoveNext()
+            Dim debuggerHidden = IsDebuggerHidden(Me.Method)
+            Dim moveNextAttrs As DebugAttributes = DebugAttributes.CompilerGeneratedAttribute
+            If debuggerHidden Then moveNextAttrs = moveNextAttrs Or DebugAttributes.DebuggerHiddenAttribute
             GenerateMoveNext(Me.StartMethodImplementation(
                     WellKnownMember.System_Runtime_CompilerServices_IAsyncStateMachine_MoveNext,
                     "MoveNext",
-                    DebugAttributes.CompilerGeneratedAttribute, Accessibility.Friend, True, asyncKickoffMethod:=Me.Method))
+                    moveNextAttrs, Accessibility.Friend, True, asyncKickoffMethod:=Me.Method))
 
             'Add IAsyncStateMachine.SetStateMachine()
             Me.StartMethodImplementation(
