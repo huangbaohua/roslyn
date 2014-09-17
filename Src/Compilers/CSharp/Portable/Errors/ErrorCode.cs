@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+﻿// Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -1282,7 +1282,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         ERR_AutoPropertyMustHaveGetAccessor = 8052,
         ERR_AutoPropertyInitializerInInterface = 8053,
 
-        ERR_InitializerInStructWithoutExplicitConstructor = 8054,
+        ERR_EnumsCantContainDefaultConstructor = 8054,
 
         ERR_EncodinglessSyntaxTree = 8055,
         ERR_AccessorListAndExpressionBody = 8056,
@@ -1299,6 +1299,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         ERR_NullPropagatingOpInExpressionTree = 8072,
         WRN_NubExprIsConstBool2 = 8073,
         ERR_DictionaryInitializerInExpressionTree = 8074,
+        ERR_ParameterlessStructCtorsMustBePublic = 8075,
 
         // Values in the range 10000-10099 are used for "Code Analysis" issues previously reported by FXCop
         WRN_CA2000_DisposeObjectsBeforeLosingScope1 = 10000,

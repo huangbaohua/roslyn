@@ -349,10 +349,52 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             }
         }
 
-        internal static bool IsParameterlessValueTypeConstructor(this MethodSymbol method, bool requireSynthesized = false)
+        /// <summary>
+        /// every struct has a public parameterless constructor either used-defined or default one
+        /// </summary>
+        internal static bool IsParameterlessValueTypeConstructor(this MethodSymbol method)
         {
-            return method.MethodKind == MethodKind.Constructor && method.ParameterCount == 0 &&
-                method.ContainingType.IsValueType && (!requireSynthesized || method.IsImplicitlyDeclared);
+            return method.MethodKind == MethodKind.Constructor && method.ParameterCount == 0 && method.ContainingType.IsValueType;
+        }
+
+        /// <summary>
+        /// default zero-init constructor symbol is added to a struct when it does not define 
+        /// its own parameterless public constructor.
+        /// We do not emit this constructor and do not call it 
+        /// </summary>
+        internal static bool IsDefaultValueTypeConstructor(this MethodSymbol method)
+        {
+            if (!method.IsParameterlessValueTypeConstructor() || !method.IsImplicitlyDeclared)
+            {
+                return false;
+            }
+
+            var container = method.ContainingType as SourceNamedTypeSymbol;
+            if ((object)container == null)
+            {
+                // synthesized ctor not from source -> must be default
+                return true;
+            }
+
+            // if we are here we have a struct in source for which a parameterless ctor was not provided by the user.
+            // So, are we ok with default behavior?
+            // Returning false will result in a production of synthesized parameterless ctor 
+
+            if(method == container.PrimaryCtor)
+            {
+                // primary ctor is considered synthesized, but should always be emitted
+                return false;
+            }
+
+            if ((object)container.PrimaryCtor != null)
+            {
+                // do not synthesize parameterless ctor if we have a primary one
+                return true;
+            }
+
+            // we do not have a primary ctor
+            // this ctor is not default if we have instance initializers
+            return container.InstanceInitializers.IsDefaultOrEmpty;
         }
 
         /// <summary>
