@@ -3,7 +3,7 @@ Roslyn
  
 Mono compatible copy of Roslyn Source Code
 
-The build requires master mono ac9e90a89d1bf959689c9439e6fbce07452691b5 or newer
+The build requires master mono 9aed010782d9ea3ad18021bafcfedc89d27a1faf or newer
  
 C# compiler
 ============
@@ -21,7 +21,7 @@ Use `xbuild Src/Workspaces/CSharp/CSharpWorkspace.csproj' to build C# workspace
 Manual changes needed
 ======================
 
-After succesfull package restore `Src/packages/Microsoft.Net.ToolsetCompilers.0.7.4070101-beta/build/Microsoft.Net.ToolsetCompilers.props' has to be replaced with
+After succesfull package restore `packages/Microsoft.Net.ToolsetCompilers.0.7.4092303-beta/build/Microsoft.Net.ToolsetCompilers.props' has to be replaced with
 ```xml
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>

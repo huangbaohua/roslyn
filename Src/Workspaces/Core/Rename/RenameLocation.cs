@@ -35,12 +35,12 @@ namespace Microsoft.CodeAnalysis.Rename
 
         public RenameLocation(ReferenceLocation referenceLocation, DocumentId documentId)
         {
-            this.ContainingLocationForStringOrComment = default(TextSpan);
             this.Location = referenceLocation.Location;
             this.DocumentId = documentId;
             this.IsCandidateLocation = referenceLocation.IsCandidateLocation && !(referenceLocation.CandidateReason == CandidateReason.LateBound);
             this.IsRenamableAliasUsage = false;
             this.IsRenamableAccessor = false;
+            this.ContainingLocationForStringOrComment = default(TextSpan);
         }
 
         public bool Equals(RenameLocation other)
