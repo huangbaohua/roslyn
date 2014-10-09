@@ -1826,7 +1826,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Add(new ImportInfo(syntax.SyntaxTree, syntax.Kind, syntax.Span));
         }
 
-        private struct ImportInfo
+        private struct ImportInfo : IEquatable<ImportInfo>
         {
             public readonly SyntaxTree Tree;
             public readonly SyntaxKind Kind;
@@ -1841,16 +1841,15 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             public override bool Equals(object obj)
             {
-                if (obj is ImportInfo)
-                {
-                    ImportInfo other = (ImportInfo)obj;
-                    return
-                        other.Kind == this.Kind &&
-                        other.Tree == this.Tree &&
-                        other.Span == this.Span;
-                }
+                return (obj is ImportInfo) && Equals((ImportInfo)obj);
+            }
 
-                return false;
+            public bool Equals(ImportInfo other)
+            {
+                return
+                    other.Kind == this.Kind &&
+                    other.Tree == this.Tree &&
+                    other.Span == this.Span;
             }
 
             public override int GetHashCode()
@@ -2585,10 +2584,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             foreach (var directive in checksumDirectives)
             {
-                var checkSumDirective = (PragmaChecksumDirectiveTriviaSyntax)directive;
-                var path = checkSumDirective.File.ValueText;
+                var checksumDirective = (PragmaChecksumDirectiveTriviaSyntax)directive;
+                var path = checksumDirective.File.ValueText;
 
-                var checkSumText = checkSumDirective.Bytes.ValueText;
+                var checksumText = checksumDirective.Bytes.ValueText;
                 var normalizedPath = moduleBeingBuilt.NormalizeDebugDocumentPath(path, basePath: tree.FilePath);
                 var existingDoc = moduleBeingBuilt.TryGetDebugDocumentForNormalizedPath(normalizedPath);
 
@@ -2605,10 +2604,11 @@ namespace Microsoft.CodeAnalysis.CSharp
                         continue;
                     }
 
-                    if (CheckSumMatches(checkSumText, existingDoc.SourceHash))
+                    var checksumAndAlgorithm = existingDoc.ChecksumAndAlgorithm;
+                    if (ChecksumMatches(checksumText, checksumAndAlgorithm.Item1))
                     {
-                        var guid = Guid.Parse(checkSumDirective.Guid.ValueText);
-                        if (guid == existingDoc.SourceHashKind)
+                        var guid = Guid.Parse(checksumDirective.Guid.ValueText);
+                        if (guid == checksumAndAlgorithm.Item2)
                         {
                             // all parts match, nothing to do
                             continue;
@@ -2617,22 +2617,22 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     // did not match to an existing document
                     // produce a warning and ignore the pragma
-                    diagnostics.Add(ErrorCode.WRN_ConflictingChecksum, new SourceLocation(checkSumDirective), path);
+                    diagnostics.Add(ErrorCode.WRN_ConflictingChecksum, new SourceLocation(checksumDirective), path);
                 }
                 else
                 {
                     var newDocument = new Cci.DebugSourceDocument(
                         normalizedPath,
                         Cci.DebugSourceDocument.CorSymLanguageTypeCSharp,
-                        MakeCheckSumBytes(checkSumDirective.Bytes.ValueText),
-                        Guid.Parse(checkSumDirective.Guid.ValueText));
+                        MakeChecksumBytes(checksumDirective.Bytes.ValueText),
+                        Guid.Parse(checksumDirective.Guid.ValueText));
 
                     moduleBeingBuilt.AddDebugDocument(newDocument);
                 }
             }
         }
 
-        private static bool CheckSumMatches(string bytesText, ImmutableArray<byte> bytes)
+        private static bool ChecksumMatches(string bytesText, ImmutableArray<byte> bytes)
         {
             if (bytesText.Length != bytes.Length * 2)
             {
@@ -2654,11 +2654,12 @@ namespace Microsoft.CodeAnalysis.CSharp
             return true;
         }
 
-        private static ImmutableArray<byte> MakeCheckSumBytes(string bytesText)
+        private static ImmutableArray<byte> MakeChecksumBytes(string bytesText)
         {
-            ArrayBuilder<byte> builder = ArrayBuilder<byte>.GetInstance();
+            int length = bytesText.Length / 2;
+            var builder = ArrayBuilder<byte>.GetInstance(length);
 
-            for (int i = 0, len = bytesText.Length / 2; i < len; i++)
+            for (int i = 0; i < length; i++)
             {
                 // 1A  in text becomes   0x1A
                 var b = SyntaxFacts.HexValue(bytesText[i * 2]) * 16 +
@@ -2672,8 +2673,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private static Cci.DebugSourceDocument MakeDebugSourceDocumentForTree(string normalizedPath, SyntaxTree tree)
         {
-            Func<ImmutableArray<byte>> checkSumSha1 = () => tree.GetSha1Checksum();
-            return new Cci.DebugSourceDocument(normalizedPath, Cci.DebugSourceDocument.CorSymLanguageTypeCSharp, checkSumSha1);
+            return new Cci.DebugSourceDocument(normalizedPath, Cci.DebugSourceDocument.CorSymLanguageTypeCSharp, () => tree.GetChecksumAndAlgorithm());
         }
 
         private void SetupWin32Resources(PEModuleBuilder moduleBeingBuilt, Stream win32Resources, DiagnosticBag diagnostics)

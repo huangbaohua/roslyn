@@ -466,9 +466,12 @@ namespace System
 }}
 ";
 
-            var corlibRef = CreateCompilation(corlibSource).EmitToImageReference(
+            var corlibRef = CreateCompilation(corlibSource).EmitToImageReference(expectedWarnings: new[]
+            {
                 // warning CS8021: No value for RuntimeMetadataVersion found. No assembly containing System.Object was found nor was a value for RuntimeMetadataVersion specified through options.
-                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1));
+                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1)
+            });
+
             var publicLibRef = CreateCompilation(string.Format(libSourceTemplate, "public"), new[] { corlibRef }).EmitToImageReference();
             var internalLibRef = CreateCompilation(string.Format(libSourceTemplate, "internal"), new[] { corlibRef }).EmitToImageReference();
 
@@ -488,9 +491,12 @@ namespace System
             var comp1 = CreateCompilation(source);
             validate(comp1);
 
-            var reference = comp1.EmitToImageReference(
+            var reference = comp1.EmitToImageReference(expectedWarnings: new[]
+            {
                 // warning CS8021: No value for RuntimeMetadataVersion found. No assembly containing System.Object was found nor was a value for RuntimeMetadataVersion specified through options.
-                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1));
+                Diagnostic(ErrorCode.WRN_NoRuntimeMetadataVersion).WithLocation(1, 1)
+            });
+
             var comp2 = CreateCompilation("", new[] { reference });
             validate(comp2);
         }
@@ -545,10 +551,6 @@ namespace System
             {
                 switch (wkt)
                 {
-                    case WellKnownType.Roslyn_Scripting_Runtime_ScriptExecutionState:
-                        // These types haven't been published yet, so there's no canonical reference we can add.
-                        // We own them though, so we can be reasonably confident that they're public and, therefore, validate.
-                        continue;
                     case WellKnownType.My_InternalXmlHelper:
                     case WellKnownType.Microsoft_VisualBasic_Embedded:
                     case WellKnownType.Microsoft_VisualBasic_CompilerServices_EmbeddedOperators:
@@ -585,11 +587,6 @@ namespace System
                 {
                     case WellKnownMember.Count: 
                         // Not a real value;
-                        continue;
-                    case WellKnownMember.Roslyn_Scripting_Runtime_ScriptExecutionState__GetSubmission:
-                    case WellKnownMember.Roslyn_Scripting_Runtime_ScriptExecutionState__SetSubmission:
-                        // These members haven't been published yet, so there's no canonical reference we can add.
-                        // We own them though, so we can be reasonably confident that they're public and, therefore, validate.
                         continue;
                     case WellKnownMember.My_InternalXmlHelper__Value:
                     case WellKnownMember.Microsoft_VisualBasic_Embedded__ctor:

@@ -296,12 +296,13 @@
     <Compile Include="CodeCleanup\Providers\PredefinedCodeCleanupProviderNames.cs" />
     <Compile Include="CodeCleanup\Providers\SimpleCodeCleanupProvider.cs" />
     <Compile Include="CodeCleanup\Providers\SimplificationCodeCleanupProvider.cs" />
-    <Compile Include="CodeFixes\BatchSimplificationFixAllProvider.cs" />
-    <Compile Include="CodeFixes\WellKnownFixAllProviders.cs" />
-    <Compile Include="CodeFixes\BatchFixAllProvider.cs" />
-    <Compile Include="CodeFixes\FixAllContext.cs" />
-    <Compile Include="CodeFixes\FixAllScope.cs" />
-    <Compile Include="CodeFixes\FixAllProvider.cs" />
+    <Compile Include="CodeFixes\CodeFixContext.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\BatchSimplificationFixAllProvider.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\WellKnownFixAllProviders.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\BatchFixAllProvider.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\FixAllContext.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\FixAllScope.cs" />
+    <Compile Include="CodeFixes\FixAllOccurrences\FixAllProvider.cs" />
     <Compile Include="CodeGeneration\AbstractCodeGenerationService.cs" />
     <Compile Include="CodeGeneration\AbstractCodeGenerationService_FindDeclaration.cs" />
     <Compile Include="CodeGeneration\AbstractFlagsEnumGenerator.cs" />
@@ -349,12 +350,14 @@
     <Compile Include="CodeGeneration\SyntaxAnnotationExtensions.cs" />
     <Compile Include="CodeGeneration\TypeConstraintKind.cs" />
     <Compile Include="CodeGeneration\TypeGenerator.cs" />
+    <Compile Include="CodeRefactorings\CodeRefactoringContext.cs" />
     <Compile Include="Log\AggregateLogger.cs" />
     <Compile Include="Log\KeyValueLogMessage.cs" />
     <Compile Include="Log\LogAggregator.cs" />
     <Compile Include="Log\Logger.LogBlock.cs" />
     <Compile Include="Log\LogMessage.cs" />
     <Compile Include="Shared\Extensions\ITypeSymbolExtensions.ReplaceTypeParameterBasedOnTypeConstraintVisitor.cs" />
+    <Compile Include="Shared\Utilities\XmlFragmentParser.cs" />
     <Compile Include="Simplification\SimplifyTypeNameCodeAction.cs" />
     <Compile Include="Utilities\WeakEventHandler.cs" />
     <Compile Include="Versions\Extensions.cs" />
@@ -931,9 +934,9 @@
     <Compile Include="CodeActions\Operations\CodeActionOperation.cs" />
     <Compile Include="CodeActions\Operations\ApplyChangesOperation.cs" />
     <Compile Include="CodeActions\Operations\OpenDocumentOperation.cs" />
-    <Compile Include="CodeFixes\ICodeFixProvider.cs" />
+    <Compile Include="CodeFixes\CodeFixProvider.cs" />
     <Compile Include="CodeFixes\ExportCodeFixProviderAttribute.cs" />
-    <Compile Include="CodeRefactorings\ICodeRefactoringProvider.cs" />
+    <Compile Include="CodeRefactorings\CodeRefactoringProvider.cs" />
     <Compile Include="CodeRefactorings\ExportCodeRefactoringProviderAttribute.cs" />
     <Compile Include="WorkspacesResources.Designer.cs">
       <AutoGen>True</AutoGen>

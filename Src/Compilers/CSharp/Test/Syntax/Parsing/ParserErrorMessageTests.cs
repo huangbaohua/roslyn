@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
@@ -876,69 +877,11 @@ public class C
 }
 ";
 
-            ParseAndValidate(test, TestOptions.Regular.WithLanguageVersion(LanguageVersion.Experimental),
-    // (11,36): error CS0743: Expected contextual keyword 'on'
-    //                 join y in array2 x equals y
-    Diagnostic(ErrorCode.ERR_ExpectedContextualKeywordOn, "equals").WithLocation(11, 36),
-    // (11,36): error CS1525: Invalid expression term 'equals'
-    //                 join y in array2 x equals y
-    Diagnostic(ErrorCode.ERR_InvalidExprTerm, "equals").WithArguments("equals").WithLocation(11, 36));
-        }
-
-        [Fact]
-        public void CS0743ERR_ExpectedContextualKeywordOn_NoDeclExpr()
-        {
-            var test = @"
-using System;
-using System.Linq;
-public class C
-{
-    public static int Main()
-    {
-        int[] array1 = { 1, 2, 3 ,4, 5, 6,};
-        int[] array2 = { 5, 6, 7, 8, 9 };
-        var c = from x in array1
-                join y in array2 x equals y
-                select x;
-        return 1;
-    }
-}
-";
-
             ParseAndValidate(test, Diagnostic(ErrorCode.ERR_ExpectedContextualKeywordOn, "x"));
         }
 
         [Fact]
         public void CS0744ERR_ExpectedContextualKeywordEquals()
-        {
-            var test = @"
-using System;
-using System.Linq;
-public class C
-{
-    public static int Main()
-    {
-        int[] array1 = { 1, 2, 3 ,4, 5, 6,};
-        int[] array2 = { 5, 6, 7, 8, 9 };
-        var c = from x in array1
-                join y in array2 on x y
-                select x;
-        return 1;
-    }
-}
-";
-
-            ParseAndValidate(test, TestOptions.Regular.WithLanguageVersion(LanguageVersion.Experimental),
-    // (11,40): error CS0744: Expected contextual keyword 'equals'
-    //                 join y in array2 on x y
-    Diagnostic(ErrorCode.ERR_ExpectedContextualKeywordEquals, "").WithLocation(11, 40),
-    // (11,40): error CS1525: Invalid expression term 'select'
-    //                 join y in array2 on x y
-    Diagnostic(ErrorCode.ERR_InvalidExprTerm, "").WithArguments("select").WithLocation(11, 40));
-        }
-
-        [Fact]
-        public void CS0744ERR_ExpectedContextualKeywordEquals_NoDeclExpr()
         {
             var test = @"
 using System;
@@ -963,36 +906,6 @@ public class C
         [WorkItem(862121, "DevDiv/Personal")]
         [Fact]
         public void CS0745ERR_ExpectedContextualKeywordBy()
-        {
-            var test = @"
-using System;
-using System.Linq;
-public class C
-{
-    public static int Main()
-    {
-        int[] array1 = { 1, 2, 3 ,4, 5, 6,};
-        int[] array2 = { 5, 6, 7, 8, 9 };
-        var c = from x in array1
-                join y in array2 on x equals y
-                group x y;
-        return 1;
-    }
-}
-";
-
-            ParseAndValidate(test, TestOptions.Regular.WithLanguageVersion(LanguageVersion.Experimental),
-    // (12,26): error CS0745: Expected contextual keyword 'by'
-    //                 group x y;
-    Diagnostic(ErrorCode.ERR_ExpectedContextualKeywordBy, ";").WithLocation(12, 26),
-    // (12,26): error CS1525: Invalid expression term ';'
-    //                 group x y;
-    Diagnostic(ErrorCode.ERR_InvalidExprTerm, ";").WithArguments(";").WithLocation(12, 26));
-        }
-
-        [WorkItem(862121, "DevDiv/Personal")]
-        [Fact]
-        public void CS0745ERR_ExpectedContextualKeywordBy_NoDeclExpr()
         {
             var test = @"
 using System;
@@ -4743,7 +4656,7 @@ class C
         public void CSharp6Features()
         {
             var source =
-@"class Foo(int z) // primary constructor
+@"class Foo
 {
     int L { get; } = 12; // auto property initializer
 
@@ -4768,15 +4681,9 @@ class C
 }";
             SyntaxFactory.ParseSyntaxTree(source, options: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Experimental)).GetDiagnostics().Verify();
 
-            SyntaxFactory.ParseSyntaxTree(source, options: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp6)).GetDiagnostics().Verify(
-                // (1,10): error CS8058: Feature 'primary constructor' is only available in 'experimental' language version.
-                // class Foo(int z) // primary constructor
-                Diagnostic(ErrorCode.ERR_FeatureIsExperimental, "(int z)").WithArguments("primary constructor").WithLocation(1, 10));
+            SyntaxFactory.ParseSyntaxTree(source, options: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp6)).GetDiagnostics().Verify();
 
             SyntaxFactory.ParseSyntaxTree(source, options: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp5)).GetDiagnostics().Verify(
-                // (1,10): error CS8058: Feature 'primary constructor' is only available in 'experimental' language version.
-                // class Foo(int z) // primary constructor
-                Diagnostic(ErrorCode.ERR_FeatureIsExperimental, "(int z)").WithArguments("primary constructor").WithLocation(1, 10),
                 // (3,20): error CS8026: Feature 'auto property initializer' is not available in C# 5.  Please use language version 6 or greater.
                 //     int L { get; } = 12; // auto property initializer
                 Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion5, "= 12").WithArguments("auto property initializer", "6").WithLocation(3, 20),
@@ -4801,6 +4708,51 @@ class C
                 // (21,17): error CS8026: Feature 'null propagating operator' is not available in C# 5.  Please use language version 6 or greater.
                 //         var s = o?.ToString(); // null propagating operator
                 Diagnostic(ErrorCode.ERR_FeatureNotAvailableInVersion5, "o?.ToString()").WithArguments("null propagating operator", "6").WithLocation(21, 17));
+        }
+
+        [Fact]
+        public void TooDeepObjectInitializer()
+        {
+            var builder = new StringBuilder();
+            const int depth = 5000;
+            builder.Append(
+@"
+class C 
+{ 
+    public C c;
+    public ulong u;
+}
+
+class Test
+{
+    void M()
+    {
+        C ");
+
+            for (int i = 0; i < depth; i++)
+            {
+                builder.AppendLine("c = new C {");
+            }
+
+            builder.Append("c = new C(), u = 0");
+
+            for (int i = 0; i < depth - 1; i++)
+            {
+                builder.AppendLine("}, u = 0");
+            }
+
+            builder.Append(
+@"
+        };
+    }
+}
+
+");
+
+            var parsedTree = Parse(builder.ToString());
+            var actualErrors = parsedTree.GetDiagnostics().ToArray();
+            Assert.Equal(1, actualErrors.Length);
+            Assert.Equal((int)ErrorCode.ERR_InsufficientStack, actualErrors[0].Code);
         }
 
         #endregion

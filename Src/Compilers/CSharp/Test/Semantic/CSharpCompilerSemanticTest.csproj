@@ -107,7 +107,6 @@
     <Compile Include="Semantics\ColorColorTests.cs" />
     <Compile Include="Semantics\ConditionalOperatorTests.cs" />
     <Compile Include="Semantics\ConstantTests.cs" />
-    <Compile Include="Semantics\DeclarationExpressionsTests.cs" />
     <Compile Include="Semantics\DynamicTests.cs" />
     <Compile Include="Semantics\ExpressionBodiedMemberTests.cs" />
     <Compile Include="Semantics\FieldInitializerBindingTests.cs" />
@@ -118,6 +117,7 @@
     <Compile Include="Semantics\ImplicitlyTypedLocalsTests.cs" />
     <Compile Include="Semantics\InheritanceBindingTests.cs" />
     <Compile Include="Semantics\InteractiveSemanticModelTests.cs" />
+    <Compile Include="Semantics\InterpolationTests.cs" />
     <Compile Include="Semantics\IteratorTests.cs" />
     <Compile Include="Semantics\LambdaTests.cs" />
     <Compile Include="Semantics\LockTests.cs" />

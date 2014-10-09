@@ -442,17 +442,17 @@ End Class
 
             Dim ary = DirectCast(typeSymbol.GetMembers("ary01").FirstOrDefault(), FieldSymbol)
             Assert.True(ary.IsShared)
-            Assert.Equal(TypeKind.ArrayType, ary.Type.TypeKind)
+            Assert.Equal(TypeKind.Array, ary.Type.TypeKind)
             Assert.Equal("System.Int16()", ary.Type.ToDisplayString(SymbolDisplayFormat.TestFormat))
 
             ary = DirectCast(typeSymbol.GetMembers("ary02").FirstOrDefault(), FieldSymbol)
             Assert.True(ary.IsShared)
-            Assert.Equal(TypeKind.ArrayType, ary.Type.TypeKind)
+            Assert.Equal(TypeKind.Array, ary.Type.TypeKind)
             Assert.Equal("System.Single()", ary.Type.ToDisplayString(SymbolDisplayFormat.TestFormat))
 
             ary = DirectCast(typeSymbol.GetMembers("ary03").FirstOrDefault(), FieldSymbol)
             Assert.True(ary.IsReadOnly)
-            Assert.Equal(TypeKind.ArrayType, ary.Type.TypeKind)
+            Assert.Equal(TypeKind.Array, ary.Type.TypeKind)
             Assert.Equal("System.Object()", ary.Type.ToDisplayString(SymbolDisplayFormat.TestFormat))
 
             ary = DirectCast(typeSymbol.GetMembers("ary04").FirstOrDefault(), FieldSymbol)
@@ -1392,7 +1392,7 @@ End Module
 
             Dim reference As MetadataReference = Nothing
             Using tempAssembly = SharedCompilationUtils.IlasmTempAssembly(ilSource.Value)
-                reference = New MetadataImageReference(ReadFromFile(tempAssembly.Path))
+                reference = MetadataReference.CreateFromImage(ReadFromFile(tempAssembly.Path))
             End Using
 
             Dim compilation = CreateCompilationWithReferences(vbSource, {MscorlibRef, MsvbRef, reference}, TestOptions.ReleaseDll)

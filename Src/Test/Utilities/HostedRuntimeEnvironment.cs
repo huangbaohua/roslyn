@@ -142,11 +142,11 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
                         ImmutableArray<byte> bytes = module.Module.PEReaderOpt.GetEntireImage().GetContent();
                         if (isManifestModule)
                         {
-                            dependencies.Add(new ModuleData(((AssemblyMetadata)metadata).Assembly.Identity, OutputKind.DynamicallyLinkedLibrary, bytes, pdb: default(ImmutableArray<byte>), inMemoryModule: !(r is MetadataFileReference)));
+                            dependencies.Add(new ModuleData(((AssemblyMetadata)metadata).GetAssembly().Identity, OutputKind.DynamicallyLinkedLibrary, bytes, pdb: default(ImmutableArray<byte>), inMemoryModule: true));
                         }
                         else
                         {
-                            dependencies.Add(new ModuleData(module.Name, bytes, pdb: default(ImmutableArray<byte>), inMemoryModule: !(r is MetadataFileReference)));
+                            dependencies.Add(new ModuleData(module.Name, bytes, pdb: default(ImmutableArray<byte>), inMemoryModule: true));
                         }
 
                         isManifestModule = false;
@@ -161,7 +161,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
 
         private static IEnumerable<ModuleMetadata> EnumerateModules(Metadata metadata)
         {
-            return (metadata.Kind == MetadataImageKind.Assembly) ? ((AssemblyMetadata)metadata).Modules.AsEnumerable() : SpecializedCollections.SingletonEnumerable((ModuleMetadata)metadata);
+            return (metadata.Kind == MetadataImageKind.Assembly) ? ((AssemblyMetadata)metadata).GetModules().AsEnumerable() : SpecializedCollections.SingletonEnumerable((ModuleMetadata)metadata);
         }
 
         internal static bool EmitCompilation(

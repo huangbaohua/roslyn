@@ -1247,16 +1247,24 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         public override BoundNode VisitSwitchStatement(BoundSwitchStatement node)
         {
-            Debug.Assert(node.OuterLocals.IsEmpty);
             Debug.Assert(this.evalStack == 0);
             DeclareLocals(node.InnerLocals, 0);
 
             var origStack = this.evalStack;
 
-            // switch expects that key local stays local
-            EnsureOnlyEvalStack();
+            // switch needs a byval local or a parameter as a key.
+            // if this is already a fitting local, let's keep it that way
+            BoundExpression boundExpression = node.BoundExpression;
+            if (boundExpression.Kind == BoundKind.Local)
+            {
+                var localSym = ((BoundLocal)boundExpression).LocalSymbol;
+                if (localSym.RefKind == RefKind.None)
+                {
+                    locals[localSym].ShouldNotSchedule();
+                }
+            }
 
-            BoundExpression boundExpression = (BoundExpression)this.Visit(node.BoundExpression);
+            boundExpression = (BoundExpression)this.Visit(boundExpression);
 
             // expression value is consumed by the switch
             this.evalStack = origStack;
@@ -1274,7 +1282,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 this.RecordLabel(breakLabel);
             }
 
-            var result = node.Update(node.OuterLocals, boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, breakLabel, node.StringEquality);
+            var result = node.Update(boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, breakLabel, node.StringEquality);
 
             // implicit control flow
             EnsureOnlyEvalStack();
@@ -1315,10 +1323,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         {
             EnsureOnlyEvalStack();
 
-            var locals = node.Locals;
+            var local = node.LocalOpt;
             var exceptionSourceOpt = node.ExceptionSourceOpt;
 
-            DeclareLocals(locals, stack: 0);
+            if ((object)local != null)
+            {
+                DeclareLocal(local, stack: 0);
+            }
 
             if (exceptionSourceOpt != null)
             {
@@ -1363,7 +1374,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             var boundBlock = (BoundBlock)this.Visit(node.Body);
             var exceptionTypeOpt = this.VisitType(node.ExceptionTypeOpt);
 
-            return node.Update(locals, exceptionSourceOpt, exceptionTypeOpt, boundFilter, boundBlock);
+            return node.Update(local, exceptionSourceOpt, exceptionTypeOpt, boundFilter, boundBlock);
         }
 
         public override BoundNode VisitStackAllocArrayCreation(BoundStackAllocArrayCreation node)
@@ -1592,8 +1603,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         private static bool CanScheduleToStack(LocalSymbol local)
         {
-            // cannot schedule constants and pinned locals
-            return !(local.IsConst || local.IsPinned);
+            return local.CanScheduleToStack;
         }
 
         private void DeclareLocals(ImmutableArray<LocalSymbol> locals, int stack)
@@ -1747,7 +1757,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         public override BoundNode VisitCatchBlock(BoundCatchBlock node)
         {
-            var locals = node.Locals;
             var exceptionSource = node.ExceptionSourceOpt;
             var type = node.ExceptionTypeOpt;
             var filter = node.ExceptionFilterOpt;
@@ -1790,7 +1799,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             body = (BoundBlock)this.Visit(body);
             type = this.VisitType(type);
 
-            return node.Update(locals, exceptionSource, type, filter, body);
+            return node.Update(node.LocalOpt, exceptionSource, type, filter, body);
         }
     }
 

@@ -246,36 +246,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private static Binder AdjustBinderForPositionWithinStatement(int position, Binder binder, StatementSyntax stmt)
         {
-            switch (stmt.CSharpKind())
-            {
-                case SyntaxKind.ForEachStatement:
-                    var forEachStmt = (ForEachStatementSyntax)stmt;
-                    if (LookupPosition.IsBetweenTokens(position, forEachStmt.InKeyword, forEachStmt.Statement.GetFirstToken()))
-                    {
-                        binder = binder.Next;
-                        Debug.Assert(binder is ScopedExpressionBinder);
-                    }
-                    break;
-
-                case SyntaxKind.ForStatement:
-                    var forStmt = (ForStatementSyntax)stmt;
-                    if (LookupPosition.IsBetweenTokens(position, forStmt.OpenParenToken, forStmt.FirstSemicolonToken))
-                    {
-                        binder = binder.Next;
-                        Debug.Assert(binder is ForLoopInitializationBinder);
-                    }
-                    break;
-
-                case SyntaxKind.SwitchStatement:
-                    var switchStmt = (SwitchStatementSyntax)stmt;
-                    if (LookupPosition.IsBetweenTokens(position, switchStmt.OpenParenToken, switchStmt.OpenBraceToken))
-                    {
-                        binder = binder.Next;
-                        Debug.Assert(binder is ScopedExpressionBinder);
-                    }
-                    break;
-            }
-
             return binder;
         }
 
@@ -461,12 +431,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         public override IMethodSymbol GetDeclaredSymbol(BaseMethodDeclarationSyntax declarationSyntax, CancellationToken cancellationToken = default(CancellationToken))
         {
             // Can't define method inside member.
-            return null;
-        }
-
-        public override IMethodSymbol GetDeclaredConstructorSymbol(TypeDeclarationSyntax declarationSyntax, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            // Can't define type inside a member.
             return null;
         }
 
@@ -1493,11 +1457,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     case SyntaxKind.VariableDeclarator: // declarators are mapped in SyntaxBinder
 
-                        if (parent.Kind == SyntaxKind.DeclarationExpression)
-                        {
-                            return GetBindableSyntaxNode(parent);
-                        }
-
                         // When a local variable declaration contains a single declarator, the bound node
                         // is associated with the declaration, rather than with the declarator.  If we
                         // used the declarator here, we would have enough context to bind it, but we wouldn't
@@ -1692,18 +1651,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // Already bound. Return the top-most bound node associated with the statement. 
                     return (BoundStatement)boundNodes[0];
                 }
-            }
-
-            internal override Binder WithPrimaryConstructorParametersIfNecessary(NamedTypeSymbol containingType)
-            {
-                Binder result = base.WithPrimaryConstructorParametersIfNecessary(containingType);
-
-                if (result != this)
-                {
-                    result = new IncrementalBinder(this.semanticModel, result);
-                }
-
-                return result;
             }
         }
     }

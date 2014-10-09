@@ -18,10 +18,10 @@ namespace TestTemplate
     /// </summary>
     public abstract partial class DiagnosticVerifier
     {
-        private static readonly MetadataReference CorlibReference = new MetadataFileReference(typeof(object).Assembly.Location, MetadataImageKind.Assembly);
-        private static readonly MetadataReference SystemCoreReference = new MetadataFileReference(typeof(Enumerable).Assembly.Location, MetadataImageKind.Assembly);
-        private static readonly MetadataReference CSharpSymbolsReference = new MetadataFileReference(typeof(CSharpCompilation).Assembly.Location, MetadataImageKind.Assembly);
-        private static readonly MetadataReference CodeAnalysisReference = new MetadataFileReference(typeof(Compilation).Assembly.Location, MetadataImageKind.Assembly);
+        private static readonly MetadataReference CorlibReference = MetadataReference.CreateFromAssembly(typeof(object).Assembly);
+        private static readonly MetadataReference SystemCoreReference = MetadataReference.CreateFromAssembly(typeof(Enumerable).Assembly);
+        private static readonly MetadataReference CSharpSymbolsReference = MetadataReference.CreateFromAssembly(typeof(CSharpCompilation).Assembly);
+        private static readonly MetadataReference CodeAnalysisReference = MetadataReference.CreateFromAssembly(typeof(Compilation).Assembly);
 
         internal static string DefaultFilePathPrefix = "Test";
         internal static string CSharpDefaultFileExt = "cs";
@@ -64,9 +64,8 @@ namespace TestTemplate
             {
                 var compilation = project.GetCompilationAsync().GetAwaiter().GetResult();
 
-                var driver = GetAnalyzerDriver(analyzer, compilation.Language);
+                var driver = AnalyzerDriver.Create(compilation, ImmutableArray.Create(analyzer), null, out compilation, CancellationToken.None);
 
-                compilation = compilation.WithEventQueue(driver.CompilationEventQueue);
                 var discarded = compilation.GetDiagnostics();
                 var diags = driver.GetDiagnosticsAsync().GetAwaiter().GetResult();
                 foreach (var diag in diags)
@@ -93,20 +92,6 @@ namespace TestTemplate
             var results = SortDiagnostics(diagnostics);
             diagnostics.Clear();
             return results;
-        }
-
-        private static AnalyzerDriver GetAnalyzerDriver(DiagnosticAnalyzer analyzer, string language)
-        {
-            if (language == LanguageNames.CSharp)
-            {
-                return new AnalyzerDriver<CSharp.SyntaxKind>(ImmutableArray.Create(analyzer), n => n.CSharpKind(), null, CancellationToken.None);
-            }
-            else if (language == LanguageNames.VisualBasic)
-            {
-                return new AnalyzerDriver<VisualBasic.SyntaxKind>(ImmutableArray.Create(analyzer), n => n.VisualBasicKind(), null, CancellationToken.None);
-            }
-
-            return null;
         }
 
         /// <summary>

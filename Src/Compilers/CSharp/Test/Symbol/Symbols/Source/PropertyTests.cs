@@ -17,25 +17,91 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Symbols.Source
     public class PropertyTests : CSharpTestBase
     {
         [Fact]
-        public void AutoWithInitializerInStructPrimaryConstructor()
+        public void SetGetOnlyAutoPropNoExperimental()
         {
-            var text = @"struct S(int i)
+            // One would think this creates an error, but it doesn't because
+            // language version is a property of the parser and there are
+            // no syntactical changes to the language for get-only autoprops
+            CreateCompilationWithMscorlib45(@"
+class C
 {
-    public int P { get; } = i;
-}";
-            CreateCompilationWithMscorlib(text, 
-               parseOptions: TestOptions.ExperimentalParseOptions).VerifyDiagnostics();
+    public int P { get; }
+}").VerifyDiagnostics();
         }
 
         [Fact]
-        public void AutoWithInitializerInClassPrimaryConstructor()
+        public void SetGetOnlyAutoPropInConstructor()
         {
-            var text = @"class C(int a)
+            CreateExperimentalCompilationWithMscorlib45(@"
+class C
 {
-    public int P { get; } = a;
-}";
-            CreateCompilationWithMscorlib(text,
-                parseOptions: TestOptions.ExperimentalParseOptions).VerifyDiagnostics();
+    public int P { get; }
+    public C()
+    {
+        P = 10;
+    }
+}").VerifyDiagnostics();
+        }
+
+        [Fact]
+        public void SetGetOnlyAutoPropOutOfConstructor()
+        {
+            CreateExperimentalCompilationWithMscorlib45(@"
+class C
+{
+    public int P { get; }
+    public static int Ps { get; }
+
+    public C()
+    {
+        Ps = 3;
+    }
+
+    public void M()
+    {
+        P = 10;
+        C.Ps = 1;
+    }
+}
+
+struct S
+{
+    public int P { get; }
+    public static int Ps { get; }
+
+    public S()
+    {
+        this = default(S);
+        Ps = 5;
+    }
+
+    public void M()
+    {
+        P = 10;
+        S.Ps = 1;
+    }
+}
+
+").VerifyDiagnostics(
+    // (27,9): error CS0200: Property or indexer 'S.Ps' cannot be assigned to -- it is read only
+    //         Ps = 5;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "Ps").WithArguments("S.Ps").WithLocation(27, 9),
+    // (9,9): error CS0200: Property or indexer 'C.Ps' cannot be assigned to -- it is read only
+    //         Ps = 3;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "Ps").WithArguments("C.Ps").WithLocation(9, 9),
+    // (14,9): error CS0200: Property or indexer 'C.P' cannot be assigned to -- it is read only
+    //         P = 10;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "P").WithArguments("C.P").WithLocation(14, 9),
+    // (15,9): error CS0200: Property or indexer 'C.Ps' cannot be assigned to -- it is read only
+    //         C.Ps = 1;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "C.Ps").WithArguments("C.Ps").WithLocation(15, 9),
+    // (32,9): error CS0200: Property or indexer 'S.P' cannot be assigned to -- it is read only
+    //         P = 10;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "P").WithArguments("S.P").WithLocation(32, 9),
+    // (33,9): error CS0200: Property or indexer 'S.Ps' cannot be assigned to -- it is read only
+    //         S.Ps = 1;
+    Diagnostic(ErrorCode.ERR_AssgReadonlyProp, "S.Ps").WithArguments("S.Ps").WithLocation(33, 9)
+    );
         }
 
         [Fact]
@@ -48,9 +114,9 @@ struct S
     int a { get { return 1; } set {} }
 }";
             CreateCompilationWithMscorlib(text).VerifyDiagnostics(
-    // (4,9): error CS8058: Feature 'struct instance member initializers and parameterless constructors' is only available in 'experimental' language version.
+    // (4,9): error CS0573: 'S': cannot have instance property or field initializers in structs
     //     int a = 2;
-    Diagnostic(ErrorCode.ERR_FeatureIsExperimental, "a").WithArguments("struct instance member initializers and parameterless constructors").WithLocation(4, 9),
+    Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "a").WithArguments("S").WithLocation(4, 9),
     // (5,9): error CS0102: The type 'S' already contains a definition for 'a'
     //     int a { get { return 1; } set {} }
     Diagnostic(ErrorCode.ERR_DuplicateNameInClass, "a").WithArguments("S", "a").WithLocation(5, 9),
@@ -100,6 +166,12 @@ struct S
 
             var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
             comp.VerifyDiagnostics(
+    // (4,16): error CS0573: 'S': cannot have instance property or field initializers in structs
+//     public int P { get; set; } = 1;
+    Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "P").WithArguments("S").WithLocation(4, 16),
+    // (6,20): error CS0573: 'S': cannot have instance property or field initializers in structs
+//     public decimal R { get; } = 300;
+    Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "R").WithArguments("S").WithLocation(6, 20)
                 );
         }
 
@@ -116,7 +188,14 @@ struct S
 }";
 
             var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
-            comp.VerifyDiagnostics();
+            comp.VerifyDiagnostics(
+    // (3,16): error CS0573: 'S': cannot have instance property or field initializers in structs
+    //     public int P { get; set; } = 1;
+    Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "P").WithArguments("S").WithLocation(3, 16),
+    // (5,20): error CS0573: 'S': cannot have instance property or field initializers in structs
+    //     public decimal R { get; } = 300;
+    Diagnostic(ErrorCode.ERR_FieldInitializerInStruct, "R").WithArguments("S").WithLocation(5, 20)
+);
 
             var global = comp.GlobalNamespace;
             var s = global.GetTypeMember("S");
@@ -158,10 +237,7 @@ struct S
 }";
             var comp = CreateCompilationWithMscorlib(text, parseOptions: TestOptions.ExperimentalParseOptions);
 
-            comp.VerifyDiagnostics(
-// (3,20): error CS8033: Auto-implemented properties must have set accessors or initializers.
-//     public int P { get; }
-Diagnostic(ErrorCode.ERR_AutoPropertyMustHaveSetOrInitializer, "get").WithArguments("C.P.get").WithLocation(3, 20));
+            comp.VerifyDiagnostics();
         }
 
         [Fact]
@@ -2373,8 +2449,8 @@ public interface IA
                 syntaxTrees: new[] { SyntaxFactory.ParseSyntaxTree(refSrc) },
                 references: new MetadataReference[] { MscorlibRef });
 
-            var refData = refComp.EmitToArray();
-            var mdRef = new MetadataImageReference(refData, embedInteropTypes: false);
+            var refData = AssemblyMetadata.CreateFromImage(refComp.EmitToArray());
+            var mdRef = refData.GetReference(embedInteropTypes: false);
             var comp = CreateCompilationWithMscorlib("", new[] { mdRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
@@ -2410,7 +2486,7 @@ public interface IA
             iam2 = ia.GetMember<MethodSymbol>("M2");
             Assert.Equal(SpecialType.System_String, iam2.ReturnType.SpecialType);
 
-            mdRef = new MetadataImageReference(refData, embedInteropTypes: true);
+            mdRef = refData.GetReference(embedInteropTypes: true);
             comp = CreateCompilationWithMscorlib("", new[] { mdRef });
 
             Assert.Equal(2, comp.ExternalReferences.Length);
@@ -2465,8 +2541,8 @@ public interface IA
                 syntaxTrees: new[] { SyntaxFactory.ParseSyntaxTree(refSrc) },
                 references: new[] { MscorlibRef });
 
-            refData = refComp.EmitToArray();
-            mdRef = new MetadataImageReference(refData, embedInteropTypes: true);
+            refData = AssemblyMetadata.CreateFromImage(refComp.EmitToArray());
+            mdRef = refData.GetReference(embedInteropTypes: true);
 
             comp = CreateCompilationWithMscorlib("", new[] { mdRef });
 

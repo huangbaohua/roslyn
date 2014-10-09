@@ -161,14 +161,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             builder.EmitThrow(isRethrow: expr == null);
         }
 
-        // specifies whether emitted conditional expression was a constant true/false or not a constant
-        private enum ConstResKind
-        {
-            ConstFalse,
-            ConstTrue,
-            NotAConst,
-        }
-
         private void EmitConditionalGoto(BoundConditionalGoto boundConditionalGoto)
         {
             object label = boundConditionalGoto.Label;
@@ -431,6 +423,53 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                     // none of above. 
                     // then it is regular binary expression - Or, And, Xor ...
                     goto default;
+
+                case BoundKind.ConditionalAccess:
+                    {
+                        var ca = (BoundConditionalAccess)condition;
+                        var receiver = ca.Receiver;
+                        var receiverType = receiver.Type;
+
+                        // we need a copy if we deal with nonlocal value (to capture the value)
+                        // or if we deal with stack local (reads are destructive)
+                        var complexCase = !receiverType.IsReferenceType ||
+                                          LocalRewriter.IntroducingReadCanBeObservable(receiver, localsMayBeAssignedOrCaptured: false) ||
+                                          (receiver.Kind == BoundKind.Local && IsStackLocal(((BoundLocal)receiver).LocalSymbol));
+
+                        if (complexCase)
+                        {
+                            goto default;
+                        }
+
+                        if (sense)
+                        {
+                            // gotoif(receiver != null) fallThrough
+                            // gotoif(receiver.Access) dest
+                            // fallThrough:
+
+                            object fallThrough = null;
+
+                            EmitCondBranch(receiver, ref fallThrough, sense: false);
+                            EmitReceiverRef(receiver, isAccessConstrained: false);
+                            EmitCondBranch(ca.AccessExpression, ref dest, sense: true);
+
+                            if (fallThrough != null)
+                            {
+                                builder.MarkLabel(fallThrough);
+                            }
+                        }
+                        else
+                        {
+                            // gotoif(receiver == null) labDest
+                            // gotoif(!receiver.Access) labDest
+                            EmitCondBranch(receiver, ref dest, sense: false);
+                            EmitReceiverRef(receiver, isAccessConstrained: false);
+                            condition = ca.AccessExpression;
+                            goto oneMoreTime;
+                        }
+
+                    }
+                    return;
 
                 case BoundKind.UnaryOperator:
                     var unOp = (BoundUnaryOperator)condition;
@@ -812,11 +851,11 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 builder.MarkLabel(typeCheckPassedLabel);
             }
 
-            foreach (var local in catchBlock.Locals)
+            if ((object)catchBlock.LocalOpt != null)
             {
-                var declaringReferences = local.DeclaringSyntaxReferences;
+                var declaringReferences = catchBlock.LocalOpt.DeclaringSyntaxReferences;
                 var localSyntax = !declaringReferences.IsEmpty ? (CSharpSyntaxNode)declaringReferences[0].GetSyntax() : catchBlock.Syntax;
-                DefineLocal(local, localSyntax);
+                DefineLocal(catchBlock.LocalOpt, localSyntax);
             }
 
             var exceptionSourceOpt = catchBlock.ExceptionSourceOpt;
@@ -906,8 +945,6 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         private void EmitSwitchStatement(BoundSwitchStatement switchStatement)
         {
-            Debug.Assert(switchStatement.OuterLocals.IsEmpty);
-
             // Switch expression must have a valid switch governing type
             Debug.Assert((object)switchStatement.BoundExpression.Type != null);
             Debug.Assert(switchStatement.BoundExpression.Type.IsValidSwitchGoverningType());
@@ -1015,20 +1052,32 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 expression = sequencePointExpression.Expression;
             }
 
-            if (expression.Kind == BoundKind.Local && ((BoundLocal)expression).LocalSymbol.RefKind == RefKind.None)
+            switch (expression.Kind)
             {
-                key = this.GetLocal((BoundLocal)expression);
-            }
-            else if (expression.Kind == BoundKind.Parameter && ((BoundParameter)expression).ParameterSymbol.RefKind == RefKind.None)
-            {
-                key = ParameterSlot((BoundParameter)expression);
-            }
-            else
-            {
-                EmitExpression(expression, true);
-                temp = AllocateTemp(expression.Type, expression.Syntax);
-                builder.EmitLocalStore(temp);
-                key = temp;
+                case BoundKind.Local:
+                    var local = ((BoundLocal)expression).LocalSymbol;
+                    if (local.RefKind == RefKind.None && !IsStackLocal(local))
+                    {
+                        key = this.GetLocal(local);
+                        break;
+                    }
+                    goto default;
+
+                case BoundKind.Parameter:
+                    var parameter = (BoundParameter)expression;
+                    if (parameter.ParameterSymbol.RefKind == RefKind.None)
+                    {
+                        key = ParameterSlot(parameter);
+                        break;
+                    }
+                    goto default;
+
+                default:
+                    EmitExpression(expression, true);
+                    temp = AllocateTemp(expression.Type, expression.Syntax);
+                    builder.EmitLocalStore(temp);
+                    key = temp;
+                    break;
             }
 
             // Emit switch jump table            
@@ -1426,8 +1475,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 // expressions do not contain labels or branches
                 BoundExpression boundExpression = node.BoundExpression;
                 ImmutableArray<BoundSwitchSection> switchSections = (ImmutableArray<BoundSwitchSection>)this.VisitList(node.SwitchSections);
-                Debug.Assert(node.OuterLocals.IsEmpty);
-                return node.Update(node.OuterLocals, boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, breakLabelClone, node.StringEquality);
+                return node.Update(boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, breakLabelClone, node.StringEquality);
             }
 
             public override BoundNode VisitSwitchLabel(BoundSwitchLabel node)

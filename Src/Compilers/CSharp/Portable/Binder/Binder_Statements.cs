@@ -271,15 +271,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     break;
 
                 default:
-                    Binder scopeBinder = GetBinder(node);
-                    BoundStatement result = scopeBinder.BindStatement(node, diagnostics);
-                    ImmutableArray<LocalSymbol> locals = scopeBinder.GetDeclaredLocalsForScope(node);
-
-                    if (!locals.IsDefaultOrEmpty)
-                    {
-                        result = new BoundBlock(node, locals, ImmutableArray.Create(result)) { WasCompilerGenerated = true };
-                    }
-
+                    BoundStatement result = BindStatement(node, diagnostics);
                     return result;
             }
 
@@ -550,7 +542,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private TypeSymbol BindVariableType(CSharpSyntaxNode declarationNode, DiagnosticBag diagnostics, TypeSyntax typeSyntax, ref bool isConst, out bool isVar, out AliasSymbol alias)
         {
-            Debug.Assert(declarationNode.Kind == SyntaxKind.LocalDeclarationStatement || declarationNode.Kind == SyntaxKind.DeclarationExpression);
+            Debug.Assert(declarationNode.Kind == SyntaxKind.LocalDeclarationStatement);
 
             // If the type is "var" then suppress errors when binding it. "var" might be a legal type
             // or it might not; if it is not then we do not want to report an error. If it is, then
@@ -1386,12 +1378,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return CheckLocalVariable(node, localSymbol, kind, checkingReceiver, diagnostics);
             }
 
-            var declarationExpr = expr as BoundDeclarationExpression;
-            if (declarationExpr != null)
-            {
-                return CheckLocalVariable(node, declarationExpr.LocalSymbol, kind, checkingReceiver, diagnostics);
-            }
-
             // SPEC: when this is used in a primary-expression within an instance constructor of a struct, 
             // SPEC: it is classified as a variable. 
 
@@ -1655,14 +1641,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case BoundKind.PropertyGroup:
                     expr = BindIndexedPropertyAccess((BoundPropertyGroup)expr, mustHaveAllOptionalParameters: false, diagnostics: diagnostics);
                     break;
-
-                case BoundKind.UninitializedVarDeclarationExpression:
-                    if (valueKind != BindValueKind.OutParameter)
-                    {
-                        return ((UninitializedVarDeclarationExpression)expr).FailInference(this, diagnostics);
-                    }
-
-                    return expr;
             }
 
             bool hasResolutionErrors = false;
@@ -1859,6 +1837,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             // SPEC: If the left operand is a property or indexer access, the property or indexer must
             // SPEC: have a set accessor. If this is not the case, a compile-time error occurs.
 
+            // Addendum: Assignment is also allowed for get-only autoprops in their constructor
+
             BoundExpression receiver;
             CSharpSyntaxNode propertySyntax;
             var propertySymbol = GetPropertySymbol(expr, out receiver, out propertySyntax);
@@ -1882,8 +1862,12 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 if ((object)setMethod == null)
                 {
-                    Error(diagnostics, ErrorCode.ERR_AssgReadonlyProp, node, propertySymbol);
-                    return false;
+                    var containing = this.ContainingMemberOrLambda;
+                    if (!AccessingAutopropertyFromConstructor(receiver, propertySymbol, containing))
+                    {
+                        Error(diagnostics, ErrorCode.ERR_AssgReadonlyProp, node, propertySymbol);
+                        return false;
+                    }
                 }
                 else if (receiver != null && receiver.Kind == BoundKind.BaseReference && setMethod.IsAbstract)
                 {
@@ -1972,6 +1956,25 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             return true;
         }
+
+        internal static bool AccessingAutopropertyFromConstructor(BoundPropertyAccess propertyAccess, Symbol fromMember)
+        {
+            return AccessingAutopropertyFromConstructor(propertyAccess.ReceiverOpt, propertyAccess.PropertySymbol, fromMember);
+        }
+
+        internal static bool AccessingAutopropertyFromConstructor(BoundExpression receiver, PropertySymbol propertySymbol, Symbol fromMember)
+        {
+            var sourceProperty = propertySymbol as SourcePropertySymbol;
+            var propertyIsStatic = propertySymbol.IsStatic;
+
+            return (object)sourceProperty != null &&
+                    sourceProperty.IsAutoProperty &&
+                    sourceProperty.ContainingType == fromMember.ContainingType &&
+                    ((MethodSymbol)fromMember).MethodKind == (propertyIsStatic ? MethodKind.StaticConstructor
+                                                                                : MethodKind.Constructor) &&
+                   (propertyIsStatic || receiver.Kind == BoundKind.ThisReference);
+        }
+
 
         /// <summary>
         /// SPEC: When a property or indexer declared in a struct-type is the target of an 
@@ -2491,14 +2494,15 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private BoundIfStatement BindIfStatement(IfStatementSyntax node, DiagnosticBag diagnostics)
         {
-            var ifBinder = this.GetBinder(node);
-            Debug.Assert(ifBinder != null);
-            return ifBinder.BindIfParts(diagnostics, ifBinder);
-        }
+            var condition = BindBooleanExpression(node.Condition, diagnostics);
+            var consequence = BindPossibleEmbeddedStatement(node.Statement, diagnostics);
+            if (node.Else == null)
+            {
+                return new BoundIfStatement(node, condition, consequence, null);
+            }
 
-        internal virtual BoundIfStatement BindIfParts(DiagnosticBag diagnostics, Binder originalBinder)
-        {
-            return this.Next.BindIfParts(diagnostics, originalBinder);
+            var alternative = BindPossibleEmbeddedStatement(node.Else.Statement, diagnostics);
+            return new BoundIfStatement(node, condition, consequence, alternative);
         }
 
         protected BoundExpression BindBooleanExpression(ExpressionSyntax node, DiagnosticBag diagnostics)
@@ -3113,8 +3117,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             BoundExpression exceptionSource = null;
             LocalSymbol local = this.Locals.FirstOrDefault();
-            if ((object)local != null && local.DeclarationKind == LocalDeclarationKind.CatchVariable)
+            if ((object)local != null)
             {
+                Debug.Assert(this.Locals.Length == 1);
+
                 // Check for local variable conflicts in the *enclosing* binder, not the *current* binder;
                 // obviously we will find a local of the given name in the current binder.
                 hasError |= this.ValidateDeclarationNameConflictsInScope(local, diagnostics);
@@ -3123,8 +3129,9 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             
             var block = this.BindBlock(node.Block, diagnostics);
-            Debug.Assert(((object)local == null || local.DeclarationKind != LocalDeclarationKind.CatchVariable) || local.Type.IsErrorType() || (local.Type == type));
-            return new BoundCatchBlock(node, GetDeclaredLocalsForScope(node), exceptionSource, type, boundFilter, block, hasError);
+            Debug.Assert((object)local == null || local.DeclarationKind == LocalDeclarationKind.CatchVariable);
+            Debug.Assert((object)local == null || local.Type.IsErrorType() || (local.Type == type));
+            return new BoundCatchBlock(node, local, exceptionSource, type, boundFilter, block, hasError);
         }
 
         private BoundExpression BindCatchFilter(CatchFilterClauseSyntax filter, DiagnosticBag diagnostics)

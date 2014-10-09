@@ -182,7 +182,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
         {
             NamespaceOrTypeSymbol lastSymbol;
             var members = GetMembers(@namespace, qualifiedName, out lastSymbol);
-            Assert.True(members.Length == 1, "Available memebers:\r\n" + string.Join("\r\n", lastSymbol.GetMembers()));
+            Assert.True(members.Length == 1, "Available members:\r\n" + string.Join("\r\n", lastSymbol.GetMembers()));
             return members.Single();
         }
 
@@ -353,7 +353,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                 return true;
                 // array type
             }
-            else if (typeSym.TypeKind == TypeKind.ArrayType)
+            else if (typeSym.TypeKind == TypeKind.Array)
             {
                 if (!expType.IsArray)
                 {

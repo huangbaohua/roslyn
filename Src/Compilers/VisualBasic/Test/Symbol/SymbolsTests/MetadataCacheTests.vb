@@ -1,5 +1,7 @@
 ﻿' Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+#Disable Warning BC40000  ' MetadataCache to be removed
+
 Imports System.Collections.Immutable
 Imports System.IO
 Imports System.Runtime.CompilerServices
@@ -108,7 +110,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
                 Assert.True(String.Equals(MetadataCache.AssembliesFromFiles.Keys.Single().FullPath, mscorlibPath, StringComparison.OrdinalIgnoreCase))
 
-                Dim assembly = cachedAssembly.Metadata.GetTarget().Assembly
+                Dim assembly = cachedAssembly.Metadata.GetTarget().GetAssembly
                 Assert.NotNull(assembly)
 
                 Assert.True(assembly.Identity.Name.Equals("mscorlib"))
@@ -120,7 +122,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                 Dim mscorlibAsm = DirectCast(cachedAssembly.CachedSymbols.First(), PEAssemblySymbol)
 
                 Assert.NotNull(mscorlibAsm)
-                Assert.Same(mscorlibAsm.Assembly, cachedAssembly.Metadata.GetTarget().Assembly)
+                Assert.Same(mscorlibAsm.Assembly, cachedAssembly.Metadata.GetTarget().GetAssembly)
                 Assert.True(mscorlibAsm.Identity.Name.Equals("mscorlib"))
                 Assert.True(mscorlibAsm.Name.Equals("mscorlib"))
                 Assert.Equal(1, mscorlibAsm.Modules.Length)
@@ -512,7 +514,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                 Assert.Same(mscorlibInfo.CachedSymbols.First(), mscorlibAsm)
 
                 Dim MTTestLib1Info = MetadataCache.AssembliesFromFiles(FileKey.Create(MTTestLib1Path))
-                Dim assembly = MTTestLib1Info.Metadata.GetTarget().Assembly
+                Dim assembly = MTTestLib1Info.Metadata.GetTarget().GetAssembly
                 Assert.NotNull(assembly)
                 Assert.Equal(1, MTTestLib1Info.CachedSymbols.Count)
 
@@ -772,7 +774,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                 Assert.Equal(0, MetadataCache.ModulesFromFiles.Count)
 
                 Dim cachedAssembly = MetadataCache.AssembliesFromFiles(FileKey.Create(multimoduleRef.FilePath))
-                Dim assembly = cachedAssembly.Metadata.GetTarget().Assembly
+                Dim assembly = cachedAssembly.Metadata.GetTarget().GetAssembly
                 Assert.NotNull(assembly)
 
                 Assert.True(assembly.Identity.Name.Equals("MultiModule"))
@@ -1164,3 +1166,4 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
         End Sub
     End Class
 End Namespace
+

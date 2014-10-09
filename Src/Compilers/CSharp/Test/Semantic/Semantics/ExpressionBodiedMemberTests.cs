@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.CSharp.UnitTests;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.Semantic.UnitTests.Semantics
@@ -41,31 +42,6 @@ class Program
             Assert.Equal(0, semanticInfo.MethodGroup.Length);
 
             Assert.False(semanticInfo.IsCompileTimeConstant);
-        }
-
-        [Fact]
-        public void ExprBodiedProp02()
-        {
-            var comp = CreateExperimentalCompilationWithMscorlib45(@"
-using System;
-
-class Program(int f)
-{
-    public int P2 => /*<bind>*/f/*</bind>*/;
-    static void Main(string[] args)
-    {
-        Console.WriteLine(new Program(2).P2);
-    }
-}
-");
-            comp.VerifyDiagnostics(
-    // (6,32): error CS0103: The name 'f' does not exist in the current context
-    //     public int P2 => /*<bind>*/f/*</bind>*/;
-    Diagnostic(ErrorCode.ERR_NameNotInContext, "f").WithArguments("f").WithLocation(6, 32));
-
-            var semanticInfo = GetSemanticInfoForTest<IdentifierNameSyntax>(comp);
-
-            Assert.Null(semanticInfo.Symbol);
         }
 
         [Fact]
@@ -221,20 +197,27 @@ class Program
         }
 
         [Fact]
+        [WorkItem(1009638)]
         public void ExprBodiedFunc02()
         {
-            var comp = CreateExperimentalCompilationWithMscorlib45(@"
-class Program(int i)
+            var comp = CreateCompilationWithMscorlib45(@"
+class C
 {
-    public int M() => /*<bind>*/i/*</bind>*/;
+    public T M<T>(T t) where T : class => /*<bind>*/t/*</bind>*/;
 }");
-            comp.VerifyDiagnostics(
-    // (4,33): error CS0103: The name 'i' does not exist in the current context
-    //     public int M() => /*<bind>*/i/*</bind>*/;
-    Diagnostic(ErrorCode.ERR_NameNotInContext, "i").WithArguments("i").WithLocation(4, 33));
+            comp.VerifyDiagnostics();
 
             var semanticInfo = GetSemanticInfoForTest<IdentifierNameSyntax>(comp);
-            Assert.Null(semanticInfo.Symbol);
+
+            Assert.Equal(TypeKind.TypeParameter, semanticInfo.Type.TypeKind);
+            Assert.Equal("T", semanticInfo.Type.Name);
+            Assert.Equal("t", semanticInfo.Symbol.Name);
+            var m = semanticInfo.Symbol.ContainingSymbol as SourceMemberMethodSymbol;
+            Assert.Equal(1, m.TypeParameters.Length);
+            Assert.Equal(m.TypeParameters[0], semanticInfo.Type);
+            Assert.Equal(m.TypeParameters[0], m.ReturnType);
+            Assert.Equal(m, semanticInfo.Type.ContainingSymbol);
+            Assert.Equal(SymbolKind.Parameter, semanticInfo.Symbol.Kind);
         }
 
         [Fact]
@@ -270,23 +253,6 @@ class Program
         }
 
         [Fact]
-        public void ExprBodiedOperator02()
-        {
-            var comp = CreateExperimentalCompilationWithMscorlib45(@"
-class Program(Program i)
-{
-    public static Program operator ++(Program p) => /*<bind>*/i/*</bind>*/;
-}");
-            comp.VerifyDiagnostics(
-    // (4,63): error CS0103: The name 'i' does not exist in the current context
-    //     public static Program operator ++(Program p) => /*<bind>*/i/*</bind>*/;
-    Diagnostic(ErrorCode.ERR_NameNotInContext, "i").WithArguments("i").WithLocation(4, 63));
-
-            var semanticInfo = GetSemanticInfoForTest<IdentifierNameSyntax>(comp);
-            Assert.Null(semanticInfo.Symbol);
-        }
-
-        [Fact]
         public void ExprBodiedConversion01()
         {
             var comp = CreateCompilationWithMscorlib45(@"
@@ -317,23 +283,6 @@ class C
             Assert.Equal(0, semanticInfo.MethodGroup.Length);
 
             Assert.False(semanticInfo.IsCompileTimeConstant);
-        }
-
-        [Fact]
-        public void ExprBodiedConversion02()
-        {
-            var comp = CreateExperimentalCompilationWithMscorlib45(@"
-class C(C c)
-{
-    public static explicit operator C(int i) => /*<bind>*/c/*</bind>*/;
-}");
-            comp.VerifyDiagnostics(
-    // (4,59): error CS0103: The name 'c' does not exist in the current context
-    //     public static explicit operator C(int i) => /*<bind>*/c/*</bind>*/;
-    Diagnostic(ErrorCode.ERR_NameNotInContext, "c").WithArguments("c").WithLocation(4, 59));
-
-            var semanticInfo = GetSemanticInfoForTest<IdentifierNameSyntax>(comp);
-            Assert.Null(semanticInfo.Symbol);
         }
 
     }

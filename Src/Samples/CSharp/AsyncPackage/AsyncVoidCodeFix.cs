@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +10,6 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Simplification;
-using Microsoft.CodeAnalysis.Text;
 
 namespace AsyncPackage
 {
@@ -17,29 +17,29 @@ namespace AsyncPackage
     /// This codefix replaces the void return type with Task in any method declaration the AsyncVoidAnalyzer catches
     /// </summary>
     [ExportCodeFixProvider(AsyncVoidAnalyzer.AsyncVoidId, LanguageNames.CSharp)]
-    public class AsyncVoidCodeFix : ICodeFixProvider
+    public class AsyncVoidCodeFix : CodeFixProvider
     {
-        public IEnumerable<string> GetFixableDiagnosticIds()
+        public sealed override ImmutableArray<string> GetFixableDiagnosticIds()
         {
-            return new[] { AsyncVoidAnalyzer.AsyncVoidId };
+            return ImmutableArray.Create(AsyncVoidAnalyzer.AsyncVoidId);
         }
 
-        public FixAllProvider GetFixAllProvider()
+        public sealed override FixAllProvider GetFixAllProvider()
         {
             return null;
         }
 
-        public async Task<IEnumerable<CodeAction>> GetFixesAsync(Document document, TextSpan span, IEnumerable<Diagnostic> diagnostics, CancellationToken cancellationToken)
+        public sealed override async Task<IEnumerable<CodeAction>> GetFixesAsync(CodeFixContext context)
         {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
 
-            var diagnosticSpan = diagnostics.First().Location.SourceSpan;
+            var diagnosticSpan = context.Diagnostics.First().Location.SourceSpan;
 
             // Find the type declaration identified by the diagnostic.
             var methodDeclaration = root.FindToken(diagnosticSpan.Start).Parent.FirstAncestorOrSelf<MethodDeclarationSyntax>();
 
             // Return a code action that will invoke the fix.
-            return new[] { new AsyncVoidCodeAction("Async methods should not return void", c => VoidToTaskAsync(document, methodDeclaration, c)) };
+            return new[] { new AsyncVoidCodeAction("Async methods should not return void", c => VoidToTaskAsync(context.Document, methodDeclaration, c)) };
         }
 
         private async Task<Document> VoidToTaskAsync(Document document, MethodDeclarationSyntax methodDeclaration, CancellationToken cancellationToken)

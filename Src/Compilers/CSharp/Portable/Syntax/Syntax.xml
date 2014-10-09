@@ -239,15 +239,6 @@
       <summary>Creates an NullableTypeSyntax node.</summary>
     </FactoryComment>
   </Node>
-  <Node Name="BaseClassWithArgumentsSyntax" Base="TypeSyntax">
-    <Kind Name="BaseClassWithArguments"/>
-    <Field Name="BaseClass" Type="TypeSyntax"/>
-    <Field Name="ArgumentList" Type="ArgumentListSyntax">
-      <PropertyComment>
-        <summary>ArgumentListSyntax node representing the list of arguments acting as arguments to the base call of the primary constructor.</summary>
-      </PropertyComment>
-    </Field>
-  </Node>
   <Node Name="OmittedTypeArgumentSyntax" Base="TypeSyntax">
     <Kind Name="OmittedTypeArgument"/>
     <Field Name="OmittedTypeArgumentToken" Type="SyntaxToken">
@@ -2438,7 +2429,6 @@
       <Kind Name="IdentifierToken"/>
     </Field>
     <Field Name="TypeParameterList" Type="TypeParameterListSyntax" Optional="true" Override="true"/>
-    <Field Name="ParameterList" Type="ParameterListSyntax" Optional="true"/>
     <Field Name="BaseList" Type="BaseListSyntax" Optional="true" Override="true"/>
     <Field Name="ConstraintClauses" Type="SyntaxList&lt;TypeParameterConstraintClauseSyntax&gt;" Override="true"/>
     <Field Name="OpenBraceToken" Type="SyntaxToken" Override="true">
@@ -2469,7 +2459,6 @@
       <Kind Name="IdentifierToken"/>
     </Field>
     <Field Name="TypeParameterList" Type="TypeParameterListSyntax" Optional="true" Override="true"/>
-    <Field Name="ParameterList" Type="ParameterListSyntax" Optional="true"/>
     <Field Name="BaseList" Type="BaseListSyntax" Optional="true" Override="true"/>
     <Field Name="ConstraintClauses" Type="SyntaxList&lt;TypeParameterConstraintClauseSyntax&gt;" Override="true"/>
     <Field Name="OpenBraceToken" Type="SyntaxToken" Override="true">
@@ -3222,12 +3211,6 @@
     <Field Name="Type" Type="TypeSyntax" Optional="true"/>
   </Node>
 
-  <Node Name="DeclarationExpressionSyntax" Base="ExpressionSyntax">
-    <Kind Name="DeclarationExpression"/>
-    <Field Name="Type" Type="TypeSyntax"/>
-    <Field Name="Variable" Type="VariableDeclaratorSyntax"/>
-  </Node>
-  
   <Node Name="SkippedTokensTriviaSyntax" Base="StructuredTriviaSyntax">
     <Kind Name="SkippedTokensTrivia"/>
     <Field Name="Tokens" Type="SyntaxList&lt;SyntaxToken&gt;"/>
@@ -3874,19 +3857,6 @@
     </Field>
     <Field Name="IsActive" Type="bool" Override="true"/>
   </Node>
-  <Node Name="PrimaryConstructorBodySyntax" Base="MemberDeclarationSyntax">
-    <TypeComment>
-      <summary>Syntax for Primary Constructor body.</summary>
-    </TypeComment>
-    <Kind Name="PrimaryConstructorBody"/>
-    <Field Name="Body" Type="BlockSyntax" Optional="false"/>
-    <Field Name="SemicolonToken" Type="SyntaxToken" Optional="true">
-      <PropertyComment>
-        <summary>Gets the optional semicolon token.</summary>
-      </PropertyComment>
-      <Kind Name="SemicolonToken"/>
-    </Field>
-  </Node>
   <Node Name="NameOfExpressionSyntax" Base="ExpressionSyntax">
     <Kind Name="NameOfExpression"/>
     <Field Name="NameOfIdentifier" Type="IdentifierNameSyntax">
@@ -3918,5 +3888,35 @@
     <FactoryComment>
       <summary>Creates an NameOfExpressionSyntax node.</summary>
     </FactoryComment>
+  </Node>
+  <Node Name="InterpolatedStringSyntax" Base="ExpressionSyntax">
+    <Kind Name="InterpolatedString" />
+    <Field Name="StringStart" Type="SyntaxToken">
+      <Kind Name="InterpolatedStringStartToken" />
+      <PropertyComment>
+        <summary>The first part of an interpolated string, from the open quote to the open curly</summary>
+      </PropertyComment>
+    </Field>
+    <Field Name="InterpolatedInserts" Type="SeparatedSyntaxList&lt;InterpolatedStringInsertSyntax&gt;">
+      <PropertyComment>
+        <summary>List of inserted expressions, separated by InterpolatedStringMid tokens for additional }...{ string literal parts.</summary>
+      </PropertyComment>
+    </Field>
+    <Field Name="StringEnd" Type="SyntaxToken">
+      <Kind Name="InterpolatedStringEndToken" />
+      <PropertyComment>
+        <summary>The last part of an interpolated string, from the close curly to the close quote</summary>
+      </PropertyComment>
+    </Field>
+  </Node>
+  <Node Name="InterpolatedStringInsertSyntax" Base="CSharpSyntaxNode">
+    <Kind Name="InterpolatedStringInsert" />
+    <Field Name="Expression" Type="ExpressionSyntax" />
+    <!-- The following are optional format specifiers as per String.Format -->
+    <!-- TODO: Add "summary" documentation comments to these. -->
+    <Field Name="Comma" Type="SyntaxToken" Optional="true" />
+    <Field Name="Alignment" Type="ExpressionSyntax" Optional="true" />
+    <Field Name="Colon" Type="SyntaxToken" Optional="true" />
+    <Field Name="Format" Type="SyntaxToken" Optional="true" />
   </Node>
 </Tree>

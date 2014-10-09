@@ -4,6 +4,7 @@
 #include "logging.h"
 #include <memory>
 #include <string>
+#include "UIStrings.h"
 
 using namespace std;
 
@@ -18,8 +19,24 @@ bool HaveLogFile()
 	return logFile != nullptr;
 }
 
-bool GetEnvVar(LPCWSTR name, wstring &value)
+wstring GetResourceString(UINT loadResource)
 {
+    extern HINSTANCE g_hinstMessages;
+    LPWSTR tempStr;
+    int result = LoadString(g_hinstMessages, loadResource, (LPWSTR)&tempStr, 0);
+
+    if (result > 0)
+    {
+        return wstring(tempStr, result);
+    }
+
+    return wstring(L"");
+}
+
+
+bool GetEnvVar(_In_z_ LPCWSTR name, _Out_ wstring &value)
+{
+	value.clear();
 	auto sizeNeeded = GetEnvironmentVariableW(name, nullptr, 0);
 	if (sizeNeeded != 0)
 	{
@@ -65,7 +82,12 @@ static void LogPrefix()
 	fprintf(logFile, "CLI PID=%u TID=%u Ticks=%u: ", GetCurrentProcessId(), GetCurrentThreadId(), GetTickCount());
 }
 
-void Log(LPCWSTR message)
+void Log(UINT loadResource)
+{
+    Log(GetResourceString(loadResource).c_str());
+}
+
+void Log(_In_z_ LPCWSTR message)
 {
 	if (logFile != nullptr) 
 	{
@@ -76,7 +98,7 @@ void Log(LPCWSTR message)
 	}
 }
  
-static void vLogFormatted(LPCWSTR message, va_list varargs)
+static void vLogFormatted(_In_z_ LPCWSTR message, va_list varargs)
 {
 	if (logFile != nullptr)
 	{
@@ -87,7 +109,15 @@ static void vLogFormatted(LPCWSTR message, va_list varargs)
 	}
 }
 
-void LogFormatted(LPCWSTR message, ...)
+void LogFormatted(UINT loadResource, ...)
+{
+    va_list varargs;
+    va_start(varargs, loadResource);
+    LogFormatted(GetResourceString(loadResource).c_str(), varargs);
+    va_end(varargs);
+}
+
+void LogFormatted(_In_z_ LPCWSTR message, ...)
 {
 	if (logFile != nullptr) 
 	{
@@ -101,69 +131,87 @@ void LogFormatted(LPCWSTR message, ...)
 
 void LogTime()
 {
-	if (logFile != nullptr) 
-	{
-		SYSTEMTIME time;
-		GetLocalTime(&time);
-		LogFormatted(L"Local time = %02d:%02d:%02d.%03d", time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-	}
+    if (logFile != nullptr)
+    {
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+        LogFormatted(IDS_FormattedLocalTime, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
+    }
 }
 
-void LogWin32Error(LPCWSTR message)
+void LogWin32Error(UINT loadResource)
 {
-	LogFormatted(L"Win32 Error Code %X during %ws", GetLastError(), message);
+    LogFormatted(GetResourceString(loadResource).c_str());
+}
+
+void LogWin32Error(_In_z_ LPCWSTR message)
+{
+    LogFormatted(IDS_LogWin32Error, GetLastError(), message);
 }
 
 void Exit(int exitCode)
 {
-	LogTime();
-	LogFormatted(L"Exiting with code %d", exitCode);
-	exit(exitCode);
+    LogTime();
+    LogFormatted(IDS_ExitingWithCode, exitCode);
+    exit(exitCode);
 }
 
-void FailWithGetLastError(LPWSTR optionalPrefix)
+void FailWithGetLastError(UINT loadResource)
 {
-	LPWSTR errorMsg;
-	if (!FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-		               nullptr,
-					   GetLastError(),
-					   0,
-					   (LPWSTR) &errorMsg,
-					   0,
-					   nullptr))
-	{
-		errorMsg = L"";
-	}
-
-	// TODO: How should this error be localized? Is there more information we could output for debugging purposes?
-	if (optionalPrefix == nullptr)
-		optionalPrefix = L"";
-
-	wstring buffer(L"Internal Compiler Client Error: ");
-	buffer += optionalPrefix;
-	buffer += L" ";
-	buffer += errorMsg;
-
-	Log(buffer.c_str());
-	LocalFree(errorMsg);
-	throw FatalError(move(buffer));
+    FailWithGetLastError(GetResourceString(loadResource).c_str());
 }
 
-void FailFormatted(LPCWSTR message, ...)
+void FailWithGetLastError(_In_z_ LPCWSTR optionalPrefix)
 {
-	va_list varargs;
-	va_start(varargs, message);
+    LPWSTR errorMsg;
+    if (!FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+        nullptr,
+        GetLastError(),
+        0,
+        (LPWSTR)&errorMsg,
+        0,
+        nullptr))
+    {
+        errorMsg = L"";
+    }
 
-	wstring fullMessage(L"Internal Compiler Client Error: ");
+    // TODO: How should this error be localized? Is there more information we could output for debugging purposes?
+    if (optionalPrefix == nullptr)
+        optionalPrefix = L"";
 
-	int needed = _vscwprintf(message, varargs);
-	auto buffer = std::make_unique <WCHAR []>(needed + 1);
-	_vsnwprintf_s(buffer.get(), needed + 1, _TRUNCATE, message, varargs);
-	va_end(varargs);
+    wstring buffer = GetResourceString(IDS_InternalCompilerClientErrorPrefix);
+    buffer += optionalPrefix;
+    buffer += L" ";
+    buffer += errorMsg;
 
-	fullMessage += buffer.release();
-	fullMessage += L"\r\n";
+    Log(buffer.c_str());
+    LocalFree(errorMsg);
+    throw FatalError(move(buffer));
+}
 
-	Log(fullMessage.c_str());
-	throw FatalError(move(fullMessage));
+void FailFormatted(UINT loadResource, ...)
+{
+    va_list varargs;
+    va_start(varargs, loadResource);
+    FailFormatted(GetResourceString(loadResource).c_str(), varargs);
+    va_end(varargs);
+}
+
+void FailFormatted(_In_z_ LPCWSTR message, ...)
+{
+    va_list varargs;
+    va_start(varargs, message);
+
+    wstring fullMessage = GetResourceString(IDS_InternalCompilerClientErrorPrefix);
+
+    int needed = _vscwprintf(message, varargs);
+    auto buffer = std::make_unique <WCHAR[]>(needed + 1);
+    _vsnwprintf_s(buffer.get(), needed + 1, _TRUNCATE, message, varargs);
+    va_end(varargs);
+
+    fullMessage += buffer.release();
+    fullMessage += L"\r\n";
+
+    Log(fullMessage.c_str());
+    throw FatalError(move(fullMessage));
 }

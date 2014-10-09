@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
@@ -295,7 +296,7 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentException("nodeOrToken");
             }
 
-            return InsertRange(index, new[] { nodeOrToken });
+            return InsertRange(index, SpecializedCollections.SingletonEnumerable(nodeOrToken));
         }
 
         /// <summary>
@@ -315,22 +316,14 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentNullException("nodesAndTokens");
             }
 
-            var items = nodesAndTokens.ToList();
-            if (items.Count == 0)
+            if (nodesAndTokens.IsEmpty())
             {
                 return this;
             }
 
             var nodes = this.ToList();
             nodes.InsertRange(index, nodesAndTokens);
-            if (nodes.Count == 0)
-            {
-                return this;
-            }
-            else
-            {
-                return CreateList(nodes[0].UnderlyingNode, nodes);
-            }
+            return CreateList(nodes[0].UnderlyingNode, nodes);
         }
 
         private static SyntaxNodeOrTokenList CreateList(GreenNode creator, List<SyntaxNodeOrToken> items)
@@ -520,6 +513,7 @@ namespace Microsoft.CodeAnalysis
         /// <summary>
         /// Enumerator for lists of SyntaxNodeOrToken structs.
         /// </summary>
+        [SuppressMessage("Performance", "RS0008", Justification = "Equality not actually implemented")]
         public struct Enumerator : IEnumerator<SyntaxNodeOrToken>
         {
             private SyntaxNodeOrTokenList list;

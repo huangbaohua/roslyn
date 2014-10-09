@@ -17,11 +17,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope = scope;
         }
 
-        public void RegisterSessionAnalyzer(DiagnosticAnalyzer analyzer)
-        {
-            this.scope.RegisterSessionAnalyzer(analyzer);
-        }
-
         public void RegisterCompilationStartAction(Action<CompilationStartAnalysisContext> action)
         {
             this.scope.RegisterCompilationStartAction(action);
@@ -42,14 +37,14 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope.RegisterSymbolAction(action, symbolKinds);
         }
 
-        public void RegisterCodeBlockStartAction<TSyntaxKind>(Action<CodeBlockStartAnalysisContext<TSyntaxKind>> action)
+        public void RegisterCodeBlockStartAction<TLanguageKindEnum>(Action<CodeBlockStartAnalysisContext<TLanguageKindEnum>> action) where TLanguageKindEnum : struct
         {
             this.scope.RegisterCodeBlockStartAction(action);
         }
 
-        public void RegisterCodeBlockEndAction<TSyntaxKind>(Action<CodeBlockEndAnalysisContext> action)
+        public void RegisterCodeBlockEndAction<TLanguageKindEnum>(Action<CodeBlockEndAnalysisContext> action) where TLanguageKindEnum : struct
         {
-            this.scope.RegisterCodeBlockEndAction<TSyntaxKind>(action);
+            this.scope.RegisterCodeBlockEndAction<TLanguageKindEnum>(action);
         }
 
         public void RegisterSyntaxTreeAction(Action<SyntaxTreeAnalysisContext> action)
@@ -57,7 +52,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope.RegisterSyntaxTreeAction(action);
         }
 
-        public void RegisterSyntaxNodeAction<TSyntaxKind>(Action<SyntaxNodeAnalysisContext> action, params TSyntaxKind[] syntaxKinds)
+        public void RegisterSyntaxNodeAction<TLanguageKindEnum>(Action<SyntaxNodeAnalysisContext> action, params TLanguageKindEnum[] syntaxKinds) where TLanguageKindEnum : struct
         {
             this.scope.RegisterSyntaxNodeAction(action, syntaxKinds);
         }
@@ -100,14 +95,14 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope.RegisterSymbolAction(action, symbolKinds);
         }
 
-        public void RegisterCodeBlockStartAction<TSyntaxKind>(Action<CodeBlockStartAnalysisContext<TSyntaxKind>> action)
+        public void RegisterCodeBlockStartAction<TLanguageKindEnum>(Action<CodeBlockStartAnalysisContext<TLanguageKindEnum>> action) where TLanguageKindEnum : struct
         {
             this.scope.RegisterCodeBlockStartAction(action);
         }
 
-        public void RegisterCodeBlockEndAction<TSyntaxKind>(Action<CodeBlockEndAnalysisContext> action)
+        public void RegisterCodeBlockEndAction<TLanguageKindEnum>(Action<CodeBlockEndAnalysisContext> action) where TLanguageKindEnum : struct
         {
-            this.scope.RegisterCodeBlockEndAction<TSyntaxKind>(action);
+            this.scope.RegisterCodeBlockEndAction<TLanguageKindEnum>(action);
         }
 
         public void RegisterSyntaxTreeAction(Action<SyntaxTreeAnalysisContext> action)
@@ -115,7 +110,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope.RegisterSyntaxTreeAction(action);
         }
 
-        public void RegisterSyntaxNodeAction<TSyntaxKind>(Action<SyntaxNodeAnalysisContext> action, params TSyntaxKind[] syntaxKinds)
+        public void RegisterSyntaxNodeAction<TLanguageKindEnum>(Action<SyntaxNodeAnalysisContext> action, params TLanguageKindEnum[] syntaxKinds) where TLanguageKindEnum : struct
         {
             this.scope.RegisterSyntaxNodeAction(action, syntaxKinds);
         }
@@ -211,9 +206,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
     /// <summary>
     /// Context for a code block start action.
     /// </summary>
-    public struct CodeBlockStartAnalysisContext<TSyntaxKind>
+    public struct CodeBlockStartAnalysisContext<TLanguageKindEnum> where TLanguageKindEnum : struct
     {
-        private readonly CodeBlockStartAnalysisScope<TSyntaxKind> scope;
+        private readonly CodeBlockStartAnalysisScope<TLanguageKindEnum> scope;
         private readonly SyntaxNode codeBlock;
         private readonly ISymbol owningSymbol;
         private readonly SemanticModel semanticModel;
@@ -226,7 +221,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         public AnalyzerOptions Options { get { return this.options; } }
         public CancellationToken CancellationToken { get { return this.cancellationToken; } }
 
-        internal CodeBlockStartAnalysisContext(CodeBlockStartAnalysisScope<TSyntaxKind> scope, SyntaxNode codeBlock, ISymbol owningSymbol, SemanticModel semanticModel, AnalyzerOptions options, CancellationToken cancellationToken)
+        internal CodeBlockStartAnalysisContext(CodeBlockStartAnalysisScope<TLanguageKindEnum> scope, SyntaxNode codeBlock, ISymbol owningSymbol, SemanticModel semanticModel, AnalyzerOptions options, CancellationToken cancellationToken)
         {
             this.scope = scope;
             this.codeBlock = codeBlock;
@@ -241,7 +236,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             this.scope.RegisterCodeBlockEndAction(action);
         }
 
-        public void RegisterSyntaxNodeAction(Action<SyntaxNodeAnalysisContext> action, params TSyntaxKind[] syntaxKinds)
+        public void RegisterSyntaxNodeAction(Action<SyntaxNodeAnalysisContext> action, params TLanguageKindEnum[] syntaxKinds)
         {
             this.scope.RegisterSyntaxNodeAction(action, syntaxKinds);
         }

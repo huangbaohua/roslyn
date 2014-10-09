@@ -92,8 +92,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         IDS_PathList = MessageBase + 12686,
         IDS_Text = MessageBase + 12687,
 
-        IDS_FeatureDeclarationExpression = MessageBase + 12688,
-        IDS_FeaturePrimaryConstructor = MessageBase + 12689,
+        // available
+
         IDS_FeatureNullPropagatingOperator = MessageBase + 12690,
         IDS_FeatureExpressionBodiedMethod = MessageBase + 12691,
         IDS_FeatureExpressionBodiedProperty = MessageBase + 12692,
@@ -140,12 +140,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Checks are in the LanguageParser unless otherwise noted.
             switch (feature)
             {
-                // Experimental features.
-                case MessageID.IDS_FeatureDeclarationExpression:
-                case MessageID.IDS_FeaturePrimaryConstructor:
-                case MessageID.IDS_FeatureStructParameterlessConstructors:
-                    return LanguageVersion.Experimental;
-
                 // C# 6 features.
                 case MessageID.IDS_FeatureExceptionFilter:
                 case MessageID.IDS_FeatureAutoPropertyInitializer:
@@ -155,6 +149,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case MessageID.IDS_FeatureExpressionBodiedIndexer:
                 case MessageID.IDS_FeatureNameof:
                 case MessageID.IDS_FeatureDictionaryInitializer:
+                case MessageID.IDS_FeatureStructParameterlessConstructors:
                     return LanguageVersion.CSharp6;
 
                 // C# 5 features.

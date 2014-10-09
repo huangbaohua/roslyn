@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,29 +17,29 @@ namespace AsyncPackage
     /// Codefix that changes the type of a variable to be Func of Task instead of a void-returning delegate type.
     /// </summary>
     [ExportCodeFixProvider(CancellationAnalyzer.CancellationId, LanguageNames.CSharp)]
-    public class CancellationCodeFix : ICodeFixProvider
+    public class CancellationCodeFix : CodeFixProvider
     {
-        public IEnumerable<string> GetFixableDiagnosticIds()
+        public sealed override ImmutableArray<string> GetFixableDiagnosticIds()
         {
-            return new[] { CancellationAnalyzer.CancellationId };
+            return ImmutableArray.Create(CancellationAnalyzer.CancellationId);
         }
 
-        public FixAllProvider GetFixAllProvider()
+        public sealed override FixAllProvider GetFixAllProvider()
         {
             return null;
         }
 
-        public async Task<IEnumerable<CodeAction>> GetFixesAsync(Document document, TextSpan span, IEnumerable<Diagnostic> diagnostics, CancellationToken cancellationToken)
+        public sealed override async Task<IEnumerable<CodeAction>> GetFixesAsync(CodeFixContext context)
         {
-            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
 
-            var diagnosticSpan = diagnostics.First().Location.SourceSpan;
+            var diagnosticSpan = context.Diagnostics.First().Location.SourceSpan;
 
             // Find the type declaration identified by the diagnostic.
             var invocation = root.FindToken(diagnosticSpan.Start).Parent.FirstAncestorOrSelf<InvocationExpressionSyntax>();
 
             // Return a code action that will invoke the fix.
-            return new[] { new CancellationCodeAction("Propagate CancellationTokens when possible", c => AddCancellationTokenAsync(document, invocation, c)) };
+            return new[] { new CancellationCodeAction("Propagate CancellationTokens when possible", c => AddCancellationTokenAsync(context.Document, invocation, c)) };
         }
 
         private async Task<Document> AddCancellationTokenAsync(Document document, InvocationExpressionSyntax invocation, CancellationToken cancellationToken)

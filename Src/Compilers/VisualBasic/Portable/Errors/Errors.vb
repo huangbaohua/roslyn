@@ -66,6 +66,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_VBCoreNetModuleConflict = 2042
         ERR_InvalidFormatForGuidForOption = 2043
         ERR_MissingGuidForOption = 2044
+        ERR_BadChecksumAlgorithm = 2045
 
         '// The naming convention is that if your error requires arguments, to append
         '// the number of args taken, e.g. AmbiguousName2
@@ -1658,6 +1659,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_CannotBeMadeNullable1 = 37238
         ERR_BadConditionalWithRef = 37239
         ERR_NullPropagatingOpInExpressionTree = 37240
+        ERR_InsufficientStack = 37241
 
         ERR_StructParameterlessInstanceCtorMustBePublic = 37241
 
@@ -1905,18 +1907,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         FEATUREID_NullPropagatingOperator = 55007
         FEATUREID_Last = 55007
 
-        ' Adding diagnostic arguments from resx file, TO DO: ASSIGN IDS
-        IDS_ProjectSettingsLocationName
-        IDS_FunctionReturnType
-        IDS_TheSystemCannotFindThePathSpecified
-        IDS_UnrecognizedFileFormat
-        IDS_MSG_ADDMODULE
-        IDS_MSG_ADDLINKREFERENCE
-        IDS_MSG_ADDREFERENCE
-        IDS_LogoLine1
-        IDS_LogoLine2
-        IDS_VBCHelp
-        IDS_InvalidPreprocessorConstantType
+        ' Adding diagnostic arguments from resx file
+        IDS_ProjectSettingsLocationName = 56000
+        IDS_FunctionReturnType = 56001
+        IDS_TheSystemCannotFindThePathSpecified = 56002
+        IDS_UnrecognizedFileFormat = 56003
+        IDS_MSG_ADDMODULE = 56004
+        IDS_MSG_ADDLINKREFERENCE = 56005
+        IDS_MSG_ADDREFERENCE = 56006
+        IDS_LogoLine1 = 56007
+        IDS_LogoLine2 = 56008
+        IDS_VBCHelp = 56009
+        IDS_InvalidPreprocessorConstantType = 56010
 
     End Enum
 End Namespace

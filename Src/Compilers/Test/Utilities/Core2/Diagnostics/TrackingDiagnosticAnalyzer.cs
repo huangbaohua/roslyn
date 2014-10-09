@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Microsoft.CodeAnalysis.Test.Utilities
 {
-    public abstract class TrackingDiagnosticAnalyzer<TSyntaxKind> : TestDiagnosticAnalyzer<TSyntaxKind>
+    public abstract class TrackingDiagnosticAnalyzer<TLanguageKindEnum> : TestDiagnosticAnalyzer<TLanguageKindEnum> where TLanguageKindEnum : struct
     {
         #region Tracking
 
@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
         {
             public readonly string AbstractMemberName;
             public readonly string CallerName;
-            public readonly TSyntaxKind SyntaxKind;
+            public readonly TLanguageKindEnum SyntaxKind;
             public readonly SymbolKind? SymbolKind;
             public readonly MethodKind? MethodKind;
             public readonly bool ReturnsVoid;
@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             {
                 AbstractMemberName = abstractMemberName;
                 CallerName = callerName;
-                SyntaxKind = node == null ? default(TSyntaxKind) : (TSyntaxKind)(object)(ushort)node.RawKind;
+                SyntaxKind = node == null ? default(TLanguageKindEnum) : (TLanguageKindEnum)(object)(ushort)node.RawKind;
                 SymbolKind = symbol == null ? (SymbolKind?)null : symbol.Kind;
                 MethodKind = symbol is IMethodSymbol ? ((IMethodSymbol)symbol).MethodKind : (MethodKind?)null;
                 ReturnsVoid = symbol is IMethodSymbol ? ((IMethodSymbol)symbol).ReturnsVoid : false;
@@ -60,7 +60,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
         #region Analysis
 
         private static readonly Regex omittedSyntaxKindRegex =
-            new Regex(@"None|Trivia|Token|Keyword|List|Xml|Cref|Compilation|Namespace|Class|Struct|Enum|Interface|Delegate|Field|Property|Indexer|Event|Operator|Constructor|Access|Incomplete|Attribute|Filter");
+            new Regex(@"None|Trivia|Token|Keyword|List|Xml|Cref|Compilation|Namespace|Class|Struct|Enum|Interface|Delegate|Field|Property|Indexer|Event|Operator|Constructor|Access|Incomplete|Attribute|Filter|InterpolatedString.*");
 
         private bool FilterByAbstractName(Entry entry, string abstractMemberName)
         {
@@ -80,7 +80,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             AssertSequenceEqual(expectedSymbolKinds, actualSymbolKinds);
         }
 
-        protected virtual bool IsAnalyzeNodeSupported(TSyntaxKind syntaxKind)
+        protected virtual bool IsAnalyzeNodeSupported(TLanguageKindEnum syntaxKind)
         {
             return !omittedSyntaxKindRegex.IsMatch(syntaxKind.ToString());
         }
@@ -97,12 +97,12 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             return true;
         }
 
-        public void VerifyOnCodeBlockCalledForAllSymbolAndMethodKinds(bool allowUnexpectedCalls = false)
+        public void VerifyOnCodeBlockCalledForAllSymbolAndMethodKinds(HashSet<SymbolKind> symbolKindsWithNoCodeBlocks = null, bool allowUnexpectedCalls = false)
         {
             const MethodKind InvalidMethodKind = (MethodKind)(-1);
             var expectedArguments = new[]
             {
-                new { SymbolKind = SymbolKind.Event,  MethodKind = InvalidMethodKind, ReturnsVoid = false },
+                new { SymbolKind = SymbolKind.Event,  MethodKind = InvalidMethodKind, ReturnsVoid = false }, // C# only
                 new { SymbolKind = SymbolKind.Field,  MethodKind = InvalidMethodKind, ReturnsVoid = false },
                 new { SymbolKind = SymbolKind.Method, MethodKind = MethodKind.Constructor, ReturnsVoid = true },
                 new { SymbolKind = SymbolKind.Method, MethodKind = MethodKind.Conversion, ReturnsVoid = false },
@@ -119,6 +119,11 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
                 new { SymbolKind = SymbolKind.Method, MethodKind = MethodKind.UserDefinedOperator, ReturnsVoid = false },
                 new { SymbolKind = SymbolKind.Property, MethodKind = InvalidMethodKind, ReturnsVoid = false },
             }.AsEnumerable();
+
+            if (symbolKindsWithNoCodeBlocks != null)
+            {
+                expectedArguments = expectedArguments.Where(a => !symbolKindsWithNoCodeBlocks.Contains(a.SymbolKind));
+            }
 
             expectedArguments = expectedArguments.Where(a => IsOnCodeBlockSupported(a.SymbolKind, a.MethodKind, a.ReturnsVoid));
 

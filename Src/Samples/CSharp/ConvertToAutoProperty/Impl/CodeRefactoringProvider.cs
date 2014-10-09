@@ -35,10 +35,14 @@ using Microsoft.CodeAnalysis.Text;
 namespace ConvertToAutoPropertyCS
 {
     [ExportCodeRefactoringProvider("ConvertToAutoPropertyCS", LanguageNames.CSharp)]
-    internal class CodeRefactoringProvider : ICodeRefactoringProvider
+    internal class ConvertToAutoPropertyCodeRefactoringProvider : CodeRefactoringProvider
     {
-        public async Task<IEnumerable<CodeAction>> GetRefactoringsAsync(Document document, TextSpan textSpan, CancellationToken cancellationToken)
+        public sealed override async Task<IEnumerable<CodeAction>> GetRefactoringsAsync(CodeRefactoringContext context)
         {
+            var document = context.Document;
+            var textSpan = context.Span;
+            var cancellationToken = context.CancellationToken;
+
             var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var token = root.FindToken(textSpan.Start);
             if (token.Parent == null)

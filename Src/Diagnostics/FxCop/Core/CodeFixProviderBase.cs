@@ -13,20 +13,22 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.FxCopAnalyzers
 {
-    public abstract class CodeFixProviderBase : ICodeFixProvider
+    public abstract class CodeFixProviderBase : CodeFixProvider
     {
         protected abstract string GetCodeFixDescription(string ruleId);
-        public abstract IEnumerable<string> GetFixableDiagnosticIds();
-
+        
         internal abstract Task<Document> GetUpdatedDocumentAsync(Document document, SemanticModel model, SyntaxNode root, SyntaxNode nodeToFix, string diagnosticId, CancellationToken cancellationToken);
 
-        async Task<IEnumerable<CodeAction>> ICodeFixProvider.GetFixesAsync(Document document, TextSpan span, IEnumerable<Diagnostic> diagnostics, CancellationToken cancellationToken)
+        public sealed override async Task<IEnumerable<CodeAction>> GetFixesAsync(CodeFixContext context)
         {
+            var document = context.Document;
+            var cancellationToken = context.CancellationToken;
+
             var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
 
             var actions = SpecializedCollections.EmptyEnumerable<CodeAction>();
-            foreach (var diagnostic in diagnostics)
+            foreach (var diagnostic in context.Diagnostics)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -45,7 +47,7 @@ namespace Microsoft.CodeAnalysis.FxCopAnalyzers
             return actions;
         }
 
-        public virtual FixAllProvider GetFixAllProvider()
+        public override FixAllProvider GetFixAllProvider()
         {
             return null;
         }

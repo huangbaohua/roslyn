@@ -338,18 +338,10 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             switch (variable.Kind)
             {
-                case SymbolKind.Parameter:
-                    // Parameters of a primary constructor are never captured, they are similar to fields.
-                    var container = variable.ContainingSymbol as SourceMethodSymbol;
-                    if ((object)container != null && container.IsPrimaryCtor)
-                    {
-                        break;
-                    }
-
-                    goto case SymbolKind.RangeVariable;
                 case SymbolKind.Local:
                     if (((LocalSymbol)variable).IsConst) break;
                     goto case SymbolKind.RangeVariable;
+                case SymbolKind.Parameter:
                 case SymbolKind.RangeVariable:
                     if (currentMethodOrLambda != variable.ContainingSymbol)
                     {
@@ -437,10 +429,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     case BoundKind.Local:
                         NoteRead(((BoundLocal)n).LocalSymbol);
-                        return;
-
-                    case BoundKind.DeclarationExpression:
-                        NoteRead(((BoundDeclarationExpression)n).LocalSymbol);
                         return;
 
                     case BoundKind.Parameter:
@@ -565,10 +553,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 {
                                     usedVariables.Add(((BoundLocal)n).LocalSymbol);
                                 }
-                                else if (n.Kind == BoundKind.DeclarationExpression)
-                                {
-                                    usedVariables.Add(((BoundDeclarationExpression)n).LocalSymbol);
-                                }
                                 continue;
                             }
                             else
@@ -604,10 +588,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                     case BoundKind.Local:
                         NoteWrite(((BoundLocal)n).LocalSymbol, value, read);
-                        return;
-
-                    case BoundKind.DeclarationExpression:
-                        NoteWrite(((BoundDeclarationExpression)n).LocalSymbol, value, read);
                         return;
 
                     case BoundKind.Parameter:
@@ -701,8 +681,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return GetOrCreateSlot(MethodThisParameter);
                 case BoundKind.Local:
                     return GetOrCreateSlot(((BoundLocal)node).LocalSymbol);
-                case BoundKind.DeclarationExpression:
-                    return GetOrCreateSlot(((BoundDeclarationExpression)node).LocalSymbol);
                 case BoundKind.Parameter:
                     return GetOrCreateSlot(((BoundParameter)node).ParameterSymbol);
                 case BoundKind.RangeVariable:
@@ -728,6 +706,26 @@ namespace Microsoft.CodeAnalysis.CSharp
                         if (!eventSymbol.HasAssociatedField) return -1;
                         int containingSlot = MakeSlot(receiverOpt);
                         return (containingSlot == -1) ? -1 : GetOrCreateSlot(eventSymbol.AssociatedField, containingSlot);
+                    }
+                case BoundKind.PropertyAccess:
+                    {
+                        var propAccess = (BoundPropertyAccess)node;
+
+                        if (Binder.AccessingAutopropertyFromConstructor(propAccess, this.currentMethodOrLambda))
+                        {
+                            var propSymbol = propAccess.PropertySymbol;
+                            var backingField = (propSymbol as SourcePropertySymbol)?.BackingField;
+                            if (backingField != null)
+                            {
+                                var receiverOpt = propAccess.ReceiverOpt;
+                                if (propSymbol.IsStatic || receiverOpt == null || receiverOpt.Kind == BoundKind.TypeExpression) return -1; // access of static property
+                                if ((object)receiverOpt.Type == null || receiverOpt.Type.TypeKind != TypeKind.Struct) return -1; // property of non-struct
+                                int containingSlot = MakeSlot(receiverOpt);
+                                return (containingSlot == -1) ? -1 : GetOrCreateSlot(backingField, containingSlot);
+                            }
+                        }
+
+                        goto default;
                     }
                 default:
                     return -1;
@@ -824,12 +822,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                         break;
                     }
 
-                case BoundKind.DeclarationExpression:
-                    {
-                        unassignedSlot = GetOrCreateSlot(((BoundDeclarationExpression)node).LocalSymbol);
-                        break;
-                    }
-
                 case BoundKind.FieldAccess:
                     {
                         var fieldAccess = (BoundFieldAccess)node;
@@ -852,6 +844,28 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                         unassignedSlot = GetOrCreateSlot(eventAccess.EventSymbol.AssociatedField, unassignedSlot);
                         break;
+                    }
+
+                case BoundKind.PropertyAccess:
+                    {
+                        var propertyAccess = (BoundPropertyAccess)node;
+                        if (Binder.AccessingAutopropertyFromConstructor(propertyAccess, this.currentMethodOrLambda))
+                        {
+                            var property = propertyAccess.PropertySymbol;
+                            var backingField = (property as SourcePropertySymbol)?.BackingField;
+                            if (backingField != null)
+                            {
+                                if (!MayRequireTracking(propertyAccess.ReceiverOpt, backingField) || IsAssigned(propertyAccess.ReceiverOpt, out unassignedSlot))
+                                {
+                                    return true;
+                                }
+
+                                unassignedSlot = GetOrCreateSlot(backingField, unassignedSlot);
+                                break;
+                            }
+                        }
+
+                        goto default;
                     }
 
                 case BoundKind.Parameter:
@@ -880,7 +894,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             alreadyReported.EnsureCapacity(unassignedSlot + 1);
             if (!alreadyReported[unassignedSlot])
             {
-                Diagnostics.Add(ErrorCode.ERR_UseDefViolationField, new SourceLocation(node), fieldSymbol.Name);
+                var associatedSymbol = fieldSymbol.AssociatedSymbol;
+                if (associatedSymbol?.Kind == SymbolKind.Property)
+                {
+                    Diagnostics.Add(ErrorCode.ERR_UseDefViolationProperty, new SourceLocation(node), associatedSymbol.Name);
+                }
+                else
+                {
+                    Diagnostics.Add(ErrorCode.ERR_UseDefViolationField, new SourceLocation(node), fieldSymbol.Name);
+                }
+
                 alreadyReported[unassignedSlot] = true; // mark the variable's slot so that we don't complain about the variable again
             }
         }
@@ -915,10 +938,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                         var result = ((BoundLocal)expression).LocalSymbol;
                         usedVariables.Add(result);
                         return result;
-                    case BoundKind.DeclarationExpression:
-                        var local = ((BoundDeclarationExpression)expression).LocalSymbol;
-                        usedVariables.Add(local);
-                        return local;
                     case BoundKind.RangeVariable:
                         return ((BoundRangeVariable)expression).RangeVariableSymbol;
                     case BoundKind.Parameter:
@@ -963,16 +982,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                         break;
                     }
 
-                case BoundKind.DeclarationExpression:
-                    {
-                        var local = (BoundDeclarationExpression)node;
-                        LocalSymbol symbol = local.LocalSymbol;
-                        int slot = GetOrCreateSlot(symbol);
-                        SetSlotState(slot, assigned: written || !this.State.Reachable);
-                        if (written) NoteWrite(symbol, value, read);
-                        break;
-                    }
-
                 case BoundKind.Local:
                     {
                         var local = (BoundLocal)node;
@@ -995,6 +1004,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case BoundKind.ThisReference:
                 case BoundKind.FieldAccess:
                 case BoundKind.EventAccess:
+                case BoundKind.PropertyAccess:
                     {
                         var expression = (BoundExpression)node;
                         int slot = MakeSlot(expression);
@@ -1244,61 +1254,47 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         public override BoundNode VisitSwitchStatement(BoundSwitchStatement node)
         {
-            DeclareVariables(node.OuterLocals);
             DeclareVariables(node.InnerLocals);
             var result = base.VisitSwitchStatement(node);
             ReportUnusedVariables(node.InnerLocals);
-            ReportUnusedVariables(node.OuterLocals);
             return result;
         }
 
         public override BoundNode VisitForStatement(BoundForStatement node)
         {
             DeclareVariables(node.OuterLocals);
-            DeclareVariables(node.InnerLocals);
             var result = base.VisitForStatement(node);
-            ReportUnusedVariables(node.InnerLocals);
             ReportUnusedVariables(node.OuterLocals);
             return result;
         }
 
         public override BoundNode VisitDoStatement(BoundDoStatement node)
         {
-            DeclareVariables(node.InnerLocals);
             var result = base.VisitDoStatement(node);
-            ReportUnusedVariables(node.InnerLocals);
             return result;
         }
 
         public override BoundNode VisitWhileStatement(BoundWhileStatement node)
         {
-            DeclareVariables(node.InnerLocals);
             var result = base.VisitWhileStatement(node);
-            ReportUnusedVariables(node.InnerLocals);
             return result;
         }
 
         public override BoundNode VisitForEachStatement(BoundForEachStatement node)
         {
-            DeclareVariables(node.OuterLocals);
             var result = base.VisitForEachStatement(node);
-            ReportUnusedVariables(node.OuterLocals);
             return result;
         }
 
         public override BoundNode VisitIfStatement(BoundIfStatement node)
         {
-            DeclareVariables(node.Locals);
             var result = base.VisitIfStatement(node);
-            ReportUnusedVariables(node.Locals);
             return result;
         }
 
         public override BoundNode VisitLockStatement(BoundLockStatement node)
         {
-            DeclareVariables(node.Locals);
             var result = base.VisitLockStatement(node);
-            ReportUnusedVariables(node.Locals);
             return result;
         }
 
@@ -1460,48 +1456,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             return null;
         }
 
-        public override BoundNode VisitDeclarationExpression(BoundDeclarationExpression node)
-        {
-            LocalSymbol localSymbol = node.LocalSymbol;
-            int slot = GetOrCreateSlot(localSymbol); // not initially assigned
-            if (initiallyAssignedVariables != null && initiallyAssignedVariables.Contains(localSymbol))
-            {
-                // When data flow analysis determines that the variable is sometimes
-                // used without being assigned first, we want to treat that variable, during region analysis,
-                // as assigned at its point of declaration.
-                Assign(node, node.InitializerOpt);
-            }
-
-            if (node.InitializerOpt != null)
-            {
-                base.VisitDeclarationExpression(node);
-                Assign(node, node.InitializerOpt);
-            }
-
-            // Treat similar to BoundLocal. This needs an adjustment for a semicolon operators.
-            CheckAssigned(localSymbol, node.Syntax);
-            return null;
-        }
-
-        protected override void VisitLvalueDeclarationExpression(BoundDeclarationExpression node)
-        {
-            LocalSymbol localSymbol = node.LocalSymbol;
-            int slot = GetOrCreateSlot(localSymbol); // not initially assigned
-            if (initiallyAssignedVariables != null && initiallyAssignedVariables.Contains(localSymbol))
-            {
-                // When data flow analysis determines that the variable is sometimes
-                // used without being assigned first, we want to treat that variable, during region analysis,
-                // as assigned at its point of declaration.
-                Assign(node, node.InitializerOpt);
-            }
-
-            if (node.InitializerOpt != null)
-            {
-                base.VisitLvalueDeclarationExpression(node);
-                Assign(node, node.InitializerOpt);
-            }
-        }
-
         public override BoundNode VisitLambda(BoundLambda node)
         {
             var oldMethodOrLambda = this.currentMethodOrLambda;
@@ -1647,9 +1601,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case BoundKind.Local:
                     CheckAssigned(((BoundLocal)expr).LocalSymbol, node);
                     break;
-                case BoundKind.DeclarationExpression:
-                    CheckAssigned(((BoundDeclarationExpression)expr).LocalSymbol, node);
-                    break;
                 case BoundKind.Parameter:
                     CheckAssigned(((BoundParameter)expr).ParameterSymbol, node);
                     break;
@@ -1681,7 +1632,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             switch (type.TypeKind)
             {
-                case TypeKind.ArrayType:
+                case TypeKind.Array:
                     MarkFieldsUsed(((ArrayTypeSymbol)type).ElementType);
                     return;
 
@@ -1776,7 +1727,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private void VisitCatchBlockInternal(BoundCatchBlock catchBlock, ref LocalState finallyState)
         {
-            DeclareVariables(catchBlock.Locals);
+            if ((object)catchBlock.LocalOpt != null)
+            {
+                DeclareVariable(catchBlock.LocalOpt);
+            }
 
             var exceptionSource = catchBlock.ExceptionSourceOpt;
             if (exceptionSource != null)
@@ -1786,9 +1740,9 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             base.VisitCatchBlock(catchBlock, ref finallyState);
 
-            foreach (var symbol in catchBlock.Locals)
+            if ((object)catchBlock.LocalOpt != null)
             {
-                ReportIfUnused(symbol, assigned: symbol.DeclarationKind != LocalDeclarationKind.CatchVariable);
+                ReportIfUnused(catchBlock.LocalOpt, assigned: false);
             }
         }
 
@@ -1841,6 +1795,29 @@ namespace Microsoft.CodeAnalysis.CSharp
                 CheckAssigned(node, node.FieldSymbol, node.Syntax);
             }
 
+            return result;
+        }
+
+        public override BoundNode VisitPropertyAccess(BoundPropertyAccess node)
+        {
+            var result = base.VisitPropertyAccess(node);
+            if (Binder.AccessingAutopropertyFromConstructor(node, this.currentMethodOrLambda))
+            {
+                var property = node.PropertySymbol;
+                var backingField = (property as SourcePropertySymbol)?.BackingField;
+                if (backingField != null)
+                {
+                    if (MayRequireTracking(node.ReceiverOpt, backingField))
+                    {
+                        // special definite assignment behavior for fields of struct local variables.
+                        int unassignedSlot;
+                        if (this.State.Reachable && !IsAssigned(node, out unassignedSlot))
+                        {
+                            ReportUnassigned(backingField, unassignedSlot, node.Syntax);
+                        }
+                    }
+                }
+            }
             return result;
         }
 

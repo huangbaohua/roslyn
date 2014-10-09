@@ -356,7 +356,7 @@ Example app.config:
             {
                 using (var emittedMetadata = AssemblyMetadata.Create(verifier.GetAllModuleMetadata()))
                 {
-                    assemblyValidator(emittedMetadata.Assembly, emitOptions);
+                    assemblyValidator(emittedMetadata.GetAssembly(), emitOptions);
                 }
             }
 
@@ -454,7 +454,7 @@ Example app.config:
             ImmutableArray<byte> assemblyBytes;
             ImmutableArray<byte> pdbBytes;
             EmitILToArray(ilSource, appendDefaultHeader, includePdb: false, assemblyBytes: out assemblyBytes, pdbBytes: out pdbBytes);
-            return new MetadataImageReference(assemblyBytes, embedInteropTypes: embedInteropTypes);
+            return AssemblyMetadata.CreateFromImage(assemblyBytes).GetReference(embedInteropTypes: embedInteropTypes);
         }
 
         internal static MetadataReference CreateReflectionEmitAssembly(Action<ModuleBuilder> create)
@@ -469,7 +469,7 @@ Example app.config:
                 assembly.Save(name);
 
                 var image = CommonTestBase.ReadFromFile(file.Path);
-                return new MetadataImageReference(image);
+                return MetadataReference.CreateFromImage(image);
             }
         }
 
@@ -680,31 +680,5 @@ Example app.config:
                 subsystemVersion: default(SubsystemVersion));
         }
         #endregion
-
-        private static MetadataReference scriptingRef = null;      
-        protected static MetadataReference MockScriptingRef
-        {
-            get
-            {
-                if (scriptingRef == null)
-                {
-                    scriptingRef = CSharp.CSharpCompilation.Create("Roslyn.Scripting",                                       
-                                       new[] { CSharp.CSharpSyntaxTree.ParseText(@"
-                                           namespace Roslyn.Scripting.Runtime
-                                           { 
-                                               public class ScriptExecutionState
-                                               {
-                                                    public object GetSubmission(int index) { return null; }
-                                                    public object SetSubmission(int index, object submission) { return null; }
-                                               }
-                                           }")
-                                       } ,
-                                       new[] { MscorlibRef },
-                                       new CSharp.CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)).EmitToImageReference();
-                }
-
-                return scriptingRef;
-            }
-        }
     }
 }

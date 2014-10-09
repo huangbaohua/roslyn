@@ -140,9 +140,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
                 Return String.Format(m_message, m_arguments)
             End Function
 
-            Public Overrides Function Equals(obj As Diagnostic) As Boolean
-                If obj Is Nothing OrElse Me.GetType() <> obj.GetType() Then Return False
-                Dim other As TestDiagnostic = CType(obj, TestDiagnostic)
+            Public Overrides Function GetHashCode() As Integer
+                Return Hash.Combine(Me.m_id.GetHashCode(), Me.m_kind.GetHashCode())
+            End Function
+
+            Public Overloads Overrides Function Equals(obj As Object) As Boolean
+                Return Me.Equals(TryCast(obj, TestDiagnostic))
+            End Function
+
+            Public Overloads Overrides Function Equals(obj As Diagnostic) As Boolean
+                Return Me.Equals(TryCast(obj, TestDiagnostic))
+            End Function
+
+            Public Overloads Function Equals(other As TestDiagnostic) As Boolean
+                If other Is Nothing OrElse Me.GetType() <> other.GetType() Then Return False
                 Return Me.m_id = other.m_id AndAlso
                     Me.m_kind = other.m_kind AndAlso
                     Me.m_location = other.m_location AndAlso
@@ -537,6 +548,71 @@ End Namespace
             compilation.VerifyAnalyzerDiagnostics({analyzer}, Nothing,
                                            AnalyzerDiagnostic("XX001", <![CDATA[N]]>),
                                            AnalyzerDiagnostic("XX001", <![CDATA[C]]>))
+        End Sub
+
+        Private Class CodeBlockAnalyzer
+            Inherits DiagnosticAnalyzer
+
+            Private Shared Descriptor As DiagnosticDescriptor = New TriggerDiagnosticDescriptor("CodeBlockDiagnostic")
+
+            Public Overrides ReadOnly Property SupportedDiagnostics As ImmutableArray(Of DiagnosticDescriptor)
+                Get
+                    Return ImmutableArray.Create(Descriptor)
+                End Get
+            End Property
+
+            Public Overrides Sub Initialize(context As AnalysisContext)
+                context.RegisterCodeBlockEndAction(Of SyntaxKind)(AddressOf OnCodeBlock)
+            End Sub
+
+            Private Shared Sub OnCodeBlock(context As CodeBlockEndAnalysisContext)
+                context.ReportDiagnostic(CodeAnalysis.Diagnostic.Create(Descriptor, context.OwningSymbol.DeclaringSyntaxReferences.First.GetLocation))
+            End Sub
+        End Class
+
+        <Fact, WorkItem(1008059)>
+        Sub TestCodeBlockAnalyzersForNoExecutableCode()
+            Dim analyzer = New CodeBlockAnalyzer()
+            Dim sources = <compilation>
+                              <file name="c.vb">
+                                  <![CDATA[
+Public MustInherit Class C
+    Public Property P() As Integer
+    Public field As Integer
+    Public MustOverride Sub Method()
+End Class
+]]>
+                              </file>
+                          </compilation>
+
+            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+                references:={SystemCoreRef, MsvbRef},
+                options:=TestOptions.ReleaseDll)
+
+            compilation.VerifyDiagnostics()
+            compilation.VerifyAnalyzerDiagnostics({analyzer})
+        End Sub
+
+        <Fact, WorkItem(1008059)>
+        Sub TestCodeBlockAnalyzersForEmptyMethodBody()
+            Dim analyzer = New CodeBlockAnalyzer()
+            Dim sources = <compilation>
+                              <file name="c.vb">
+                                  <![CDATA[
+Public Class C
+    Public Sub Method()
+    End Sub
+End Class
+]]>
+                              </file>
+                          </compilation>
+
+            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+                references:={SystemCoreRef, MsvbRef},
+                options:=TestOptions.ReleaseDll)
+
+            compilation.VerifyDiagnostics()
+            compilation.VerifyAnalyzerDiagnostics({analyzer}, Nothing, AnalyzerDiagnostic("CodeBlockDiagnostic", <![CDATA[Public Sub Method()]]>))
         End Sub
     End Class
 End Namespace

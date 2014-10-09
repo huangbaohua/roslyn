@@ -228,7 +228,7 @@ namespace Microsoft.CodeAnalysis
         public bool TryGetSemanticModel(out SemanticModel semanticModel)
         {
             semanticModel = null;
-            return this.model != null && this.model.TryGetTarget(out semanticModel) && semanticModel != null;
+            return this.model != null && this.model.TryGetTarget(out semanticModel);
         }
 
         /// <summary>
@@ -265,7 +265,7 @@ namespace Microsoft.CodeAnalysis
                 }
 
                 // it looks like someone has set it. try to reuse same semantic model
-                if (original.TryGetTarget(out semanticModel) && semanticModel != null)
+                if (original.TryGetTarget(out semanticModel))
                 {
                     return semanticModel;
                 }

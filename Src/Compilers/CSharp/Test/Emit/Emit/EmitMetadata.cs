@@ -245,7 +245,7 @@ public class Test : Class2
             context.Diagnostics.Verify();
 
             // check that there are no duplicate rows in AssemblyRef table:
-            PEAssembly emittedAssembly = AssemblyMetadata.CreateFromImage(image).Assembly;
+            PEAssembly emittedAssembly = AssemblyMetadata.CreateFromImage(image).GetAssembly();
             var emittedReferences = emittedAssembly.Modules[0].ReferencedAssemblies;
             Assert.Equal(1, emittedReferences.Length);
             Assert.Equal("foo", emittedReferences[0].Name);
@@ -254,14 +254,8 @@ public class Test : Class2
         [Fact, WorkItem(529006, "DevDiv")]
         public void AddModule()
         {
-            var netModule1 = new MetadataImageReference(
-                ModuleMetadata.CreateFromImage(
-                    TestResources.SymbolsTests.netModule.netModule1),
-                    filePath: Path.GetFullPath("netModule1.netmodule"));
-            var netModule2 = new MetadataImageReference(
-                ModuleMetadata.CreateFromImage(
-                    TestResources.SymbolsTests.netModule.netModule2),
-                    filePath: Path.GetFullPath("netModule2.netmodule"));
+            var netModule1 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.netModule.netModule1).GetReference(filePath: Path.GetFullPath("netModule1.netmodule"));
+            var netModule2 = ModuleMetadata.CreateFromImage(TestResources.SymbolsTests.netModule.netModule2).GetReference(filePath: Path.GetFullPath("netModule2.netmodule"));
 
             string source = @"
 public class Test : Class1
@@ -904,6 +898,36 @@ class C : I
         }
 
         [Fact]
+        public void SetGetOnlyAutopropsInConstructors()
+        {
+            var comp = CreateCompilationWithMscorlib45(@"using System;
+class C
+{
+    public int P1 { get; }
+    public static int P2 { get; }
+
+    public C()
+    {
+        P1 = 10;
+    }
+
+    static C()
+    {
+        P2 = 11;
+    }
+    
+    static void Main()
+    {
+        Console.Write(C.P2);
+        var c = new C();
+        Console.Write(c.P1);
+    }
+}", options: TestOptions.DebugExe);
+
+            CompileAndVerify(comp, expectedOutput: "1110");
+        }
+
+        [Fact]
         public void AutoPropInitializersClass()
         {
             var comp = CreateCompilationWithMscorlib(@"using System;
@@ -962,17 +986,20 @@ class C
         [Fact]
         public void AutoPropInitializersStruct()
         {
-            var comp = CreateCompilationWithMscorlib(@"using System;
+            var comp = CreateCompilationWithMscorlib(@"
+using System;
 struct S
 {
     public readonly int P;
-    public string Q { get; set; } = ""test"";
-    public decimal R { get; } = 300;
+    public string Q { get; }
+    public decimal R { get; }
     public static char T { get; } = 'T';
 
     public S(int p)
     {
         P = p;
+        Q = ""test"";
+        R = 300;
     }
 
     static void Main()
@@ -985,7 +1012,7 @@ struct S
 
         s = new S();
         Console.Write(s.P);
-        Console.Write(s.Q);
+        Console.Write(s.Q ?? ""null"");
         Console.Write(s.R);
         Console.Write(S.T);
     }
@@ -1004,7 +1031,7 @@ struct S
 
                 var q = type.GetMember<SourcePropertySymbol>("Q");
                 var qBack = q.BackingField;
-                Assert.False(qBack.IsReadOnly);
+                Assert.True(qBack.IsReadOnly);
                 Assert.False(qBack.IsStatic);
                 Assert.Equal(qBack.Type.SpecialType, SpecialType.System_String);
 
@@ -1024,9 +1051,8 @@ struct S
             CompileAndVerify(
                 comp,
                 sourceSymbolValidator: validator,
-                expectedOutput: "1test300T0test300T");
+                expectedOutput: "1test300T0null0T");
         }
-
 
         /// <summary>
         /// Private accessors of a virtual property should not be virtual.

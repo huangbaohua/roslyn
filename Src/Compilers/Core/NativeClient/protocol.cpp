@@ -2,6 +2,7 @@
 #include "pipe_utils.h"
 #include "protocol.h"
 #include "logging.h"
+#include "UIStrings.h"
 
 using namespace std;
 
@@ -36,7 +37,8 @@ Request& Request::operator=(Request&& other)
 
 Request::Request(
 	RequestLanguage language,
-	wstring&& currentDirectory)
+	const wstring&& currentDirectory)
+#pragma warning(suppress: 6011)
 	: Request(PROTOCOL_VERSION,
 			  language,
 		      { Request::Argument(
@@ -48,7 +50,7 @@ vector<Request::Argument>& Request::Arguments()
 	return this->arguments;
 }
 
-void Request::AddCommandLineArguments(list<wstring>& commandLineArgs)
+void Request::AddCommandLineArguments(_In_ const list<wstring>& commandLineArgs)
 {
 	size_t i;
 	list<wstring>::const_iterator iter;
@@ -115,7 +117,7 @@ bool Request::WriteToPipe(IPipe& pipe)
 
     auto currentSize = static_cast<unsigned int>(buffer.size());
     auto bufferData = buffer.data();
-    LogFormatted(L"Writing request of size %u", currentSize);
+    LogFormatted(IDS_WritingRequest, currentSize);
     return pipe.Write(&currentSize, sizeof(currentSize))
            && pipe.Write(bufferData, currentSize);
 }
@@ -155,17 +157,17 @@ wstring ReadStringFromPipe(IPipe& pipe)
     int stringLength;
     if (!pipe.Read(&stringLength, sizeof(stringLength)))
     {
-        FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
     }
 
-    LogFormatted(L"String length = %d", stringLength);
+    LogFormatted(IDS_StringLength, stringLength);
 
 	wstring string;
 	string.resize(stringLength);
 
     if (!pipe.Read(&string[0], stringLength * sizeof(wchar_t)))
     {
-        FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
     }
 
 	return string;
@@ -176,12 +178,12 @@ CompletedResponse ReadCompletedResponse(IPipe& pipe)
     int exitCode; 
     if (!pipe.Read(&exitCode, sizeof(exitCode)))
     {
-        FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
     }
 	bool utf8output;
 	if (!pipe.Read(&utf8output, sizeof(utf8output)))
 	{
-		FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
 	}
     auto output = ReadStringFromPipe(pipe);
     auto errorOutput = ReadStringFromPipe(pipe);
@@ -193,34 +195,33 @@ CompletedResponse ReadCompletedResponse(IPipe& pipe)
 // received, throws a FatalError exception.
 CompletedResponse ReadResponse(IPipe& pipe)
 {
-    Log(L"Reading response");
+    Log(IDS_ReadingResponse);
 
     int sizeInBytes;
     Response::ResponseType responseType;
 
     if (!pipe.Read(&sizeInBytes, sizeof(sizeInBytes)))
     {
-        FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
     }
-    LogFormatted(L"Response has %d bytes", sizeInBytes);
+    LogFormatted(IDS_ResponseSize, sizeInBytes);
 
     if (!pipe.Read(&responseType, sizeof(responseType)))
     {
-        FailFormatted(L"Pipe read failed\n");
+        FailFormatted(IDS_PipeReadFailed);
     }
-    LogFormatted(L"Response type: %d", responseType);
+    LogFormatted(IDS_ResponseType, responseType);
 
     switch (responseType)
     {
     case Response::MISMATCHED_VERSION:
-		FailWithGetLastError(L"Received mismatched version response from server. "
-			L"Are your client and server binaries out of sync?");
-		break;
+        FailWithGetLastError(IDS_VersionMismatch);
+        break;
     case Response::COMPLETED:
-		break;
+        break;
     default:
-        FailWithGetLastError(L"Received unknown response from server");
+        FailWithGetLastError(IDS_UnknownResponse);
         break;
     }
-	return ReadCompletedResponse(pipe);
+    return ReadCompletedResponse(pipe);
 }

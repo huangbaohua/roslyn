@@ -200,12 +200,20 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                 Diagnostic(ErrorCode.ERR_InvalidAssemblyCultureForExe, @"""pt-BR""").WithLocation(1, 46));
         }
 
-        [Fact(Skip = "1032718"), WorkItem(1032718)]
+        [Fact(Skip = "Bug 1032718"), WorkItem(1032718)]
         public void MismatchedSurrogateInAssemblyCultureAttribute()
         {
             string s = @"[assembly: System.Reflection.AssemblyCultureAttribute(""\uD800"")]";
             var comp = CreateCompilationWithMscorlib(s, options: TestOptions.ReleaseDll);
             comp.Emit(Stream.Null);
+        }
+
+        [Fact(Skip = "Bug 1034455"), WorkItem(1034455)]
+        public void NullCharInAssemblyCultureAttribute()
+        {
+            string s = @"[assembly: System.Reflection.AssemblyCultureAttribute(""\0"")]";
+            var comp = CreateCompilationWithMscorlib(s, options: TestOptions.ReleaseDll);
+            comp.GetDiagnostics();
         }
 
         [Fact]
@@ -780,7 +788,7 @@ public class C {}
             Assert.True(compilation.Emit(stream).Success);
             stream.Position = 0;
 
-            using (var metadata = ModuleMetadata.CreateFromImageStream(stream))
+            using (var metadata = ModuleMetadata.CreateFromStream(stream))
             {
                 var peReader = metadata.MetadataReader;
                 AssemblyDefinition row = peReader.GetAssemblyDefinition();
@@ -842,10 +850,10 @@ public class C {}
                 }
                 ";
 
-        private MetadataImageReference GetNetModuleWithAssemblyAttributesRef(string source = null, IEnumerable<MetadataReference> references = null)
+        private MetadataReference GetNetModuleWithAssemblyAttributesRef(string source = null, IEnumerable<MetadataReference> references = null)
         {
             string assemblyName = GetUniqueName();
-            return new MetadataImageReference(GetNetModuleWithAssemblyAttributes(source, references, assemblyName), display: assemblyName + ".netmodule");
+            return GetNetModuleWithAssemblyAttributes(source, references, assemblyName).GetReference(display: assemblyName + ".netmodule");
         }
 
         private ModuleMetadata GetNetModuleWithAssemblyAttributes(string source = null, IEnumerable<MetadataReference> references = null, string assemblyName = null)
@@ -908,7 +916,7 @@ public class C {}
 
             var consoleappCompilation = CreateCompilationWithMscorlib(
                 consoleappSource, 
-                references: new[] { new MetadataImageReference(netModuleWithAssemblyAttributes) }, 
+                references: new[] { netModuleWithAssemblyAttributes.GetReference() }, 
                 options: TestOptions.ReleaseExe);
 
             var diagnostics = consoleappCompilation.GetDiagnostics();
@@ -939,7 +947,7 @@ public class C {}
 
             var exeMetadata = AssemblyMetadata.CreateFromImage(consoleappCompilation.EmitToArray());
 
-            peModule = exeMetadata.Assembly.ManifestModule; 
+            peModule = exeMetadata.GetAssembly().ManifestModule; 
             metadataReader = peModule.GetMetadataReader();
 
             Assert.Equal(1, metadataReader.GetTableRowCount(TableIndex.ModuleRef));
@@ -952,7 +960,7 @@ public class C {}
 
             consoleappCompilation = CreateCompilationWithMscorlib(
                 consoleappSource, 
-                references: new[] { new MetadataImageReference(netModuleWithAssemblyAttributes) },
+                references: new[] { netModuleWithAssemblyAttributes.GetReference() },
                 options: TestOptions.ReleaseModule);
 
             Assert.Equal(0, consoleappCompilation.Assembly.GetAttributes().Length);

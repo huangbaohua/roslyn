@@ -1052,7 +1052,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             refKind = parameter.RefKind;
 
             if (result.Kind == MemberResolutionKind.ApplicableInExpandedForm &&
-                parameter.IsParams && parameter.Type.TypeKind == TypeKind.ArrayType)
+                parameter.IsParams && parameter.Type.TypeKind == TypeKind.Array)
             {
                 return ((ArrayTypeSymbol)parameter.Type).ElementType;
             }
@@ -1140,18 +1140,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 RefKind refKind1, refKind2;
                 var type1 = GetParameterType(i, m1.Result, m1.LeastOverriddenMember.GetParameters(), out refKind1);
                 var type2 = GetParameterType(i, m2.Result, m2.LeastOverriddenMember.GetParameters(), out refKind2);
-
-                if (argumentKind == BoundKind.UninitializedVarDeclarationExpression)
-                {
-                    // If argument is a 'var' declaration without initializer,
-                    // neither candidate is better in this argument.
-                    if (allSame && Conversions.ClassifyImplicitConversion(type1, type2, ref useSiteDiagnostics).Kind != ConversionKind.Identity)
-                    {
-                        allSame = false;
-                    }
-
-                    continue;
-                }
 
                 bool okToDowngradeToNeither;
                 var r = BetterConversionFromExpression(arguments[i],
@@ -1390,7 +1378,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             Debug.Assert(t1.Count == t2.Count);
 
-            // For t1 to be more specific than t2, it has to be not less specific in every memeber,
+            // For t1 to be more specific than t2, it has to be not less specific in every member,
             // and more specific in at least one.
 
             var result = BetterResult.Neither;
@@ -1459,7 +1447,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             // SPEC EXTENSION: We apply the same rule to pointer types. 
 
-            if (t1.TypeKind == TypeKind.PointerType)
+            if (t1.TypeKind == TypeKind.Pointer)
             {
                 var p1 = (PointerTypeSymbol)t1;
                 var p2 = (PointerTypeSymbol)t2;
@@ -2600,14 +2588,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 // defer applicability check to runtime:
                 return Conversion.ImplicitDynamic;
-            }
-
-            if (argument.Kind == BoundKind.UninitializedVarDeclarationExpression)
-            {
-                Debug.Assert(argRefKind != RefKind.None);
-
-                // Any parameter type is good, we'll use it for the var local.
-                return Conversion.Identity;
             }
 
             if (argRefKind == RefKind.None)

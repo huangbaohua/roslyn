@@ -1,4 +1,5 @@
 ﻿// Copyright (c) Microsoft Open Technologies, Inc.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+#pragma warning disable CS0618
 
 using System;
 using System.Collections.Generic;
@@ -139,7 +140,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                     catch (FileNotFoundException)
                     { }
 
-                    lazyDisplayName = base.Display;
+                    lazyDisplayName = Path.GetFileName(this.FullPath);
                 }
 
                 return lazyDisplayName;
@@ -198,8 +199,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
                 analyzerAssembly = GetAssembly();
             }
-            catch (Exception e) if (e is FileLoadException || e is FileNotFoundException || e is BadImageFormatException ||
-                                    e is SecurityException || e is ArgumentException || e is PathTooLongException)
+            catch (Exception e) if (e is IOException || e is BadImageFormatException || e is SecurityException || e is ArgumentException)
             {
                 this.AnalyzerLoadFailed?.Invoke(this, new AnalyzerLoadFailureEventArgs(AnalyzerLoadFailureEventArgs.FailureErrorCode.UnableToLoadAnalyzer, e, null));
                 return;
@@ -285,11 +285,13 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// <summary>
         /// Opens the analyzer dll with the metadata reader and builds a map of language -> analyzer type names.
         /// </summary>
+        /// <exception cref="BadImageFormatException">The PE image format is invalid.</exception>
+        /// <exception cref="IOException">IO error reading the metadata.</exception>
         private static ImmutableDictionary<string, ImmutableHashSet<string>> GetAnalyzerTypeNameMap(string fullPath)
         {
-            using (var assembly = MetadataFileFactory.CreateAssembly(fullPath))
+            using (var assembly = AssemblyMetadata.CreateFromFile(fullPath))
             {
-                var typeNameMap = from module in assembly.Modules
+                var typeNameMap = from module in assembly.GetModules()
                                   from typeDefHandle in module.MetadataReader.TypeDefinitions
                                   let typeDef = module.MetadataReader.GetTypeDefinition(typeDefHandle)
                                   let typeName = GetFullyQualifiedTypeName(typeDef, module.Module)
@@ -330,7 +332,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             // Single string parameter
             if (argsReader.Length > 4)
             {
-                // check prolog
+                // check prologue
                 if (argsReader.ReadByte() == 1 && argsReader.ReadByte() == 0)
                 {
                     string languageName;

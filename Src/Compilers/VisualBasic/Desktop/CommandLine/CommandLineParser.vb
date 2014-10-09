@@ -3,9 +3,11 @@
 Imports System.Collections.Immutable
 Imports System.Globalization
 Imports System.IO
+Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Text
 Imports Microsoft.CodeAnalysis.Instrumentation
+Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.SyntaxFacts
 Imports Roslyn.Utilities
@@ -96,7 +98,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim parseDocumentationComments As Boolean = False ' Don't just null check documentationFileName because we want to do this even if the file name is invalid.
                 Dim outputKind As OutputKind = OutputKind.ConsoleApplication
                 Dim ssVersion As SubsystemVersion = SubsystemVersion.None
-                Dim languageVersion As LanguageVersion = LanguageVersion.VisualBasic11
+                Dim languageVersion As LanguageVersion = LanguageVersion.VisualBasic14
                 Dim mainTypeName As String = Nothing
                 Dim win32ManifestFile As String = Nothing
                 Dim win32ResourceFile As String = Nothing
@@ -108,6 +110,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Dim additionalFiles = New List(Of AdditionalStream)()
                 Dim additionalOptions = New Dictionary(Of String, String)()
                 Dim codepage As Encoding = Nothing
+                Dim checksumAlgorithm = SourceHashAlgorithm.Sha1
                 Dim defines As IReadOnlyDictionary(Of String, Object) = Nothing
                 Dim metadataReferences = New List(Of CommandLineReference)()
                 Dim analyzers = New List(Of CommandLineAnalyzerReference)()
@@ -291,13 +294,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                 Continue For
                             End If
 
-                            Dim encoding = ParseCodepage(value)
+                            Dim encoding = TryParseEncodingName(value)
                             If encoding Is Nothing Then
                                 AddDiagnostic(diagnostics, ERRID.ERR_BadCodepage, value)
                                 Continue For
                             End If
 
                             codepage = encoding
+                            Continue For
+
+                        Case "checksumalgorithm"
+                            If String.IsNullOrEmpty(value) Then
+                                AddDiagnostic(diagnostics, ERRID.ERR_ArgumentRequired, "checksumalgorithm", ":<algorithm>")
+                                Continue For
+                            End If
+
+                            Dim newChecksumAlgorithm = TryParseHashAlgorithmName(value)
+                            If newChecksumAlgorithm = SourceHashAlgorithm.None Then
+                                AddDiagnostic(diagnostics, ERRID.ERR_BadChecksumAlgorithm, value)
+                                Continue For
+                            End If
+
+                            checksumAlgorithm = newChecksumAlgorithm
                             Continue For
 
                         Case "removeintchecks", "removeintchecks+"
@@ -639,6 +657,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                         Case "11", "11.0"
                                             languageVersion = LanguageVersion.VisualBasic11
                                         Case "12", "12.0"
+                                            languageVersion = LanguageVersion.VisualBasic12
+                                        Case "14", "14.0"
                                             languageVersion = LanguageVersion.VisualBasic12
                                         Case "experimental"
                                             languageVersion = LanguageVersion.Experimental
@@ -1126,6 +1146,7 @@ lVbRuntimePlus:
                     .DocumentationPath = documentationPath,
                     .SourceFiles = sourceFiles.AsImmutable(),
                     .Encoding = codepage,
+                    .ChecksumAlgorithm = checksumAlgorithm,
                     .MetadataReferences = metadataReferences.AsImmutable(),
                     .AnalyzerReferences = analyzers.AsImmutable(),
                     .AdditionalStreams = additionalFiles.AsImmutable(),
@@ -1172,16 +1193,13 @@ lVbRuntimePlus:
 
                 ' Load System.Runtime.dll and see if it has any references
                 Try
-                    Dim systemRuntimeMetadata = MetadataCache.GetOrCreateFromFile(systemRuntimePath, MetadataImageKind.Assembly)
-                    Debug.Assert(systemRuntimeMetadata IsNot Nothing)
-
-                    ' Prefer 'System.Runtime.dll' if it does not have any references
-                    If systemRuntimeMetadata.Kind = MetadataImageKind.Assembly Then
-                        Dim assemblyMetadata = DirectCast(systemRuntimeMetadata, AssemblyMetadata)
-                        If assemblyMetadata.ManifestModule.Module.IsLinkedModule AndAlso assemblyMetadata.Assembly.AssemblyReferences.Length = 0 Then
+                    Using metadata = AssemblyMetadata.CreateFromFile(systemRuntimePath)
+                        ' Prefer 'System.Runtime.dll' if it does not have any references
+                        If metadata.GetModules()(0).Module.IsLinkedModule AndAlso
+                           metadata.GetAssembly().AssemblyReferences.Length = 0 Then
                             Return New CommandLineReference(systemRuntimePath, New MetadataReferenceProperties(MetadataImageKind.Assembly))
                         End If
-                    End If
+                    End Using
                 Catch
                     ' If we caught anything, there is something wrong with System.Runtime.dll and we fall back to mscorlib.dll
                 End Try

@@ -309,8 +309,11 @@
   <data name="StreamMustSupportReadAndSeek" xml:space="preserve">
     <value>Stream must support read and seek operations.</value>
   </data>
-  <data name="InvalidSHA1Hash" xml:space="preserve">
-    <value>Invalid SHA1 hash.</value>
+  <data name="InvalidHash" xml:space="preserve">
+    <value>Invalid hash.</value>
+  </data>
+  <data name="UnsupportedHashAlgorithm" xml:space="preserve">
+    <value>Unsupported hash algorithm.</value>
   </data>
   <data name="CoffResourceInvalidRelocation" xml:space="preserve">
     <value>Win32 resources, assumed to be in COFF object format, have one or more invalid relocation header values.</value>
@@ -368,5 +371,11 @@
   </data>
   <data name="RuleSetHasDuplicateRules" xml:space="preserve">
     <value>The rule set file has duplicate rules for '{0}' with differing actions '{1}' and '{2}'.</value>
+  </data>
+  <data name="CantCreateModuleReferenceToAssembly" xml:space="preserve">
+    <value>Can't create a module reference to an assembly.</value>
+  </data>
+  <data name="CantCreateReferenceToDynamicAssembly" xml:space="preserve">
+    <value>Can't create a metadata reference to a dynamic assembly.</value>
   </data>
 </root>

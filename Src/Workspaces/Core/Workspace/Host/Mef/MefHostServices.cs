@@ -4,9 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
-using System.ComponentModel.Composition.Primitives;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -237,7 +235,7 @@ namespace Microsoft.CodeAnalysis.Host.Mef
             private readonly string language;
             private readonly ImmutableArray<Lazy<ILanguageService, LanguageServiceMetadata>> services;
 
-            private ImmutableDictionary<Type, Lazy<ILanguageService, LanguageServiceMetadata>> serviceMap 
+            private ImmutableDictionary<Type, Lazy<ILanguageService, LanguageServiceMetadata>> serviceMap
                 = ImmutableDictionary<Type, Lazy<ILanguageService, LanguageServiceMetadata>>.Empty;
 
             public MefLanguageServices(
@@ -246,6 +244,7 @@ namespace Microsoft.CodeAnalysis.Host.Mef
             {
                 this.workspaceServices = workspaceServices;
                 this.language = language;
+
                 var hostServices = (MefHostServices)workspaceServices.HostServices;
 
                 this.services = hostServices.GetExports<ILanguageService, LanguageServiceMetadata>()
@@ -283,7 +282,7 @@ namespace Microsoft.CodeAnalysis.Host.Mef
             }
 
             internal bool TryGetService(Type serviceType, out Lazy<ILanguageService, LanguageServiceMetadata> service)
-            { 
+            {
                 if (!this.serviceMap.TryGetValue(serviceType, out service))
                 {
                     service = ImmutableInterlocked.GetOrAdd(ref this.serviceMap, serviceType, svctype =>
@@ -345,11 +344,93 @@ namespace Microsoft.CodeAnalysis.Host.Mef
             var key = new ExportKey(typeof(TExtension).AssemblyQualifiedName, typeof(TMetadata).AssemblyQualifiedName);
             if (!this.exportsMap.TryGetValue(key, out exports))
             {
+                var count = 0;
+
                 exports = ImmutableInterlocked.GetOrAdd(ref this.exportsMap, key, _ =>
-                    this.exportProvider.GetExports<TExtension, TMetadata>().ToImmutableArray());
+                {
+                    var result = this.exportProvider.GetExports<TExtension, TMetadata>().ToImmutableArray();
+
+                    count++;
+                    CrashIfSyntaxTreeFactoryServiceDoesntExistForCSharpOrVB(result);
+
+                    return result;
+                });
             }
 
-            return (IEnumerable<Lazy<TExtension, TMetadata>>)exports;
+            var final = (IEnumerable<Lazy<TExtension, TMetadata>>)exports;
+            CrashIfSyntaxTreeFactoryServiceDoesntExistForCSharpOrVB(final);
+
+            return final;
+        }
+
+        /// <summary>
+        /// diagnostic instrument to find out race in MeftHostService
+        /// </summary>
+        private void CrashIfSyntaxTreeFactoryServiceDoesntExistForCSharpOrVB<TExtension, TMetadata>(IEnumerable<Lazy<TExtension, TMetadata>> services)
+        {
+            if (typeof(TExtension) != typeof(ILanguageServiceFactory))
+            {
+                return;
+            }
+
+            var hasLanguageService = false;
+            var hasCSharpService = false;
+            var hasVBService = false;
+
+            foreach (var lazy in services)
+            {
+                var metadata = lazy.Metadata as LanguageServiceMetadata;
+                if (metadata == null)
+                {
+                    continue;
+                }
+
+                if (metadata.Language != LanguageNames.CSharp && metadata.Language != LanguageNames.VisualBasic)
+                {
+                    continue;
+                }
+
+                hasLanguageService = true;
+
+                if (metadata.ServiceType != typeof(ISyntaxTreeFactoryService).AssemblyQualifiedName)
+                {
+                    continue;
+                }
+
+                if (metadata.Language == LanguageNames.CSharp)
+                {
+                    hasCSharpService = true;
+                }
+
+                if (metadata.Language == LanguageNames.VisualBasic)
+                {
+                    hasVBService = true;
+                }
+
+                if (hasCSharpService && hasVBService)
+                {
+                    break;
+                }
+            }
+
+            if (!hasLanguageService || (hasVBService && hasCSharpService))
+            {
+                return;
+            }
+
+            var tempLanguages = this.languages == null ? null : this.languages.ToArray();
+            var tempServices = services.Select(lz => ValueTuple.Create(lz.Value, lz.Metadata)).ToArray();
+            var tempExportMap = this.exportsMap.Select(kv => ValueTuple.Create(kv.Key, kv.Value == null ? null : kv.Value as IEnumerable<object>))
+                                               .Select(t => ValueTuple.Create(t.Item1, t.Item2 == null ? null : t.Item2.ToArray())).ToArray();
+
+            var tempServices2 = services;
+
+            ExceptionHelpers.Crash(new Exception("Crash"));
+
+            GC.KeepAlive(tempLanguages);
+            GC.KeepAlive(tempServices);
+            GC.KeepAlive(tempServices2);
+            GC.KeepAlive(tempExportMap);
         }
 
         /// <summary>

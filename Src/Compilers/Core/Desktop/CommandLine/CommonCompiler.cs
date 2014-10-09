@@ -106,7 +106,7 @@ namespace Microsoft.CodeAnalysis
                 {
                     // when compiling into an assembly (csc/vbc) we only allow #r that match references given on command line:
                     referenceDirectiveResolver = new ExistingReferencesResolver(
-                        resolved.Where(r => r.Properties.Kind == MetadataImageKind.Assembly).OfType<MetadataFileReference>().AsImmutable(),
+                        resolved.Where(r => r.Properties.Kind == MetadataImageKind.Assembly).OfType<PortableExecutableReference>().AsImmutable(),
                         Arguments.ReferencePaths,
                         Arguments.BaseDirectory,
                         assemblyIdentityComparer,
@@ -124,11 +124,12 @@ namespace Microsoft.CodeAnalysis
         /// <param name="file">Source file information.</param>
         /// <param name="diagnostics">Storage for diagnostics.</param>
         /// <param name="encoding">Encoding to use or 'null' for autodetect/default</param>
+        /// <param name="checksumAlgorithm">Hash algorithm used to calculate file checksum.</param>
         /// <returns>File content or null on failure.</returns>
-        internal SourceText ReadFileContent(CommandLineSourceFile file, IList<DiagnosticInfo> diagnostics, Encoding encoding)
+        internal SourceText ReadFileContent(CommandLineSourceFile file, IList<DiagnosticInfo> diagnostics, Encoding encoding, SourceHashAlgorithm checksumAlgorithm)
         {
             string discarded;
-            return ReadFileContent(file, diagnostics, encoding, out discarded);
+            return ReadFileContent(file, diagnostics, encoding, checksumAlgorithm, out discarded);
         }
 
         /// <summary>
@@ -137,16 +138,17 @@ namespace Microsoft.CodeAnalysis
         /// <param name="file">Source file information.</param>
         /// <param name="diagnostics">Storage for diagnostics.</param>
         /// <param name="encoding">Encoding to use or 'null' for autodetect/default</param>
+        /// <param name="checksumAlgorithm">Hash algorithm used to calculate file checksum.</param>
         /// <param name="normalizedFilePath">If given <paramref name="file"/> opens successfully, set to normalized absolute path of the file, null otherwise.</param>
         /// <returns>File content or null on failure.</returns>
-        internal SourceText ReadFileContent(CommandLineSourceFile file, IList<DiagnosticInfo> diagnostics, Encoding encoding, out string normalizedFilePath)
+        internal SourceText ReadFileContent(CommandLineSourceFile file, IList<DiagnosticInfo> diagnostics, Encoding encoding, SourceHashAlgorithm checksumAlgorithm, out string normalizedFilePath)
         {
             try
             {
                 using (var data = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     normalizedFilePath = data.Name;
-                    return EncodedStringText.Create(data, encoding);
+                    return EncodedStringText.Create(data, encoding, checksumAlgorithm);
                 }
             }
             catch (Exception e)
@@ -290,7 +292,7 @@ namespace Microsoft.CodeAnalysis
             AnalyzerDriver analyzerDriver = null;
             if (!analyzers.IsDefaultOrEmpty)
             {
-                compilation = AnalyzerDriver.AttachAnalyzerDriverToCompilation(compilation, analyzers, out analyzerDriver, analyzerOptions, cancellationToken);
+                analyzerDriver = AnalyzerDriver.Create(compilation, analyzers, analyzerOptions, out compilation, cancellationToken);
             }
 
             // Print the diagnostics produced during the parsing stage and exit if there were any errors.
@@ -880,7 +882,7 @@ namespace Microsoft.CodeAnalysis
 
             if (parameters.Length == 0)
             {
-                arguments = new object[0];
+                arguments = SpecializedCollections.EmptyObjects;
             }
             else
             {

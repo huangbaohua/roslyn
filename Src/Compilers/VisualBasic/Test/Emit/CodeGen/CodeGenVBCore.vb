@@ -2430,7 +2430,7 @@ End Class
 ]]>
          </file>
      </compilation>),
-            references:=NoVbRuntimeReferences.Concat({New MetadataImageReference(memory.ToImmutable())}),
+            references:=NoVbRuntimeReferences.Concat({MetadataReference.CreateFromImage(memory.ToImmutable())}),
             options:=TestOptions.ReleaseDll)
 
             CompilationUtils.AssertTheseDiagnostics(c,
@@ -3021,7 +3021,7 @@ End Namespace
               references:=NoVbRuntimeReferences,
               options:=TestOptions.ReleaseDll.WithEmbedVbCoreRuntime(False))
 
-            compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_NewInStruct, "New"),
+            compilation.VerifyDiagnostics(
                                     Diagnostic(ERRID.ERR_StructCantInherit, "Inherits System.Exception"),
                                     Diagnostic(ERRID.ERR_UseOfKeywordFromStructure1, "MyBase").WithArguments("MyBase"))
         End Sub

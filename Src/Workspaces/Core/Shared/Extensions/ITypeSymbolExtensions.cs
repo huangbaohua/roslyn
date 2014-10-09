@@ -432,7 +432,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
         {
             return typeSymbol.IsSealed ||
                    typeSymbol.IsValueType ||
-                   typeSymbol.TypeKind == TypeKind.ArrayType ||
+                   typeSymbol.TypeKind == TypeKind.Array ||
                    typeSymbol.TypeKind == TypeKind.Delegate ||
                    typeSymbol.SpecialType == SpecialType.System_Array ||
                    typeSymbol.SpecialType == SpecialType.System_Delegate ||
@@ -627,7 +627,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                 return null;
             }
 
-            // For t1 to be more specific than t2, it has to be not less specific in every memeber,
+            // For t1 to be more specific than t2, it has to be not less specific in every member,
             // and more specific in at least one.
 
             bool? result = null;

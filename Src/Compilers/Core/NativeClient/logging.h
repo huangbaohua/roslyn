@@ -17,11 +17,17 @@ public:
 };
 
 bool HaveLogFile();
-bool GetEnvVar(LPCWSTR name, std::wstring &value);
+std::wstring GetResourceString(UINT);
+bool GetEnvVar(_In_z_ LPCWSTR name, _Out_ std::wstring &value);
 void InitializeLogging();
-void Log(LPCWSTR message);
-void LogFormatted(LPCWSTR message, ...);
+void Log(UINT loadResource);
+void Log(_In_z_ LPCWSTR message);
+void LogFormatted(UINT loadResource, ...);
+void LogFormatted(_In_z_ LPCWSTR message, ...);
 void LogTime();
-void LogWin32Error(LPCWSTR message);
-void FailWithGetLastError(LPWSTR optionalPrefix = nullptr);
-void FailFormatted(LPCWSTR message, ...);
+void LogWin32Error(UINT loadResource);
+void LogWin32Error(_In_z_ LPCWSTR message);
+void FailWithGetLastError(UINT loadResource);
+void FailWithGetLastError(_In_z_ LPCWSTR optionalPrefix = nullptr);
+void FailFormatted(UINT loadResource, ...);
+void FailFormatted(_In_z_ LPCWSTR message, ...);

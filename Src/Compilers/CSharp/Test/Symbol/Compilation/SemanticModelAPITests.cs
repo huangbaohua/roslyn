@@ -1002,7 +1002,7 @@ class Test
 }
 ";
             var comp1 = CreateCompilationWithMscorlib("public class C { }");
-            var ref1 = new MetadataImageReference(CompileAndVerify(comp1).EmittedAssemblyData, aliases: ImmutableArray.Create("X"));
+            var ref1 = comp1.EmitToImageReference(aliases: ImmutableArray.Create("X"));
 
             var comp2 = CreateCompilationWithMscorlib(source, new[] { ref1 });
             var tree = comp2.SyntaxTrees.Single();
@@ -1930,9 +1930,9 @@ unsafe class C
 
             var typeInfo = speculativeModel.GetTypeInfo(initializer);
             Assert.Equal("System.Int32*", typeInfo.Type.ToTestDisplayString());
-            Assert.Equal(TypeKind.PointerType, typeInfo.Type.TypeKind);
+            Assert.Equal(TypeKind.Pointer, typeInfo.Type.TypeKind);
             Assert.Equal("System.Int32*", typeInfo.ConvertedType.ToTestDisplayString());
-            Assert.Equal(TypeKind.PointerType, typeInfo.ConvertedType.TypeKind);
+            Assert.Equal(TypeKind.Pointer, typeInfo.ConvertedType.TypeKind);
 
             var conv = speculativeModel.GetConversion(initializer);
             Assert.Equal(ConversionKind.Identity, conv.Kind);
@@ -3104,8 +3104,8 @@ class C
 
 ";
 
-            var libBytes = CreateCompilationWithMscorlib("", assemblyName: "lib").EmitToArray();
-            var comp = CreateCompilationWithMscorlib(source, new[] { new MetadataImageReference(libBytes, aliases: ImmutableArray.Create("Alias")) });
+            var libRef = CreateCompilationWithMscorlib("", assemblyName: "lib").EmitToImageReference(aliases: ImmutableArray.Create("Alias"));
+            var comp = CreateCompilationWithMscorlib(source, new[] { libRef });
             var tree = comp.SyntaxTrees.Single();
             var model = comp.GetSemanticModel(tree);
 
