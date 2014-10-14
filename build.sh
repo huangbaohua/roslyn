@@ -10,4 +10,4 @@ echo "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/dev
   </PropertyGroup>
 </Project>" >packages/Microsoft.Net.ToolsetCompilers.0.7.4100302-beta/build/Microsoft.Net.ToolsetCompilers.props
 xbuild /p:Configuration=Debug Src/Compilers/CSharp/csc/csc.csproj
-xbuild /p:Configuration=Debug Src/Workspaces/CSharp/Portable/CSharpWorkspace.csproj
+xbuild /p:Configuration=Debug ./Src/Workspaces/CSharp/Desktop/CSharpWorkspace.Desktop.csproj
