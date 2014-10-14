@@ -8,6 +8,6 @@ echo "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/dev
     <VbcToolPath>$(MSBuildThisFileDirectory)..\tools</VbcToolPath>
     <VbcToolExe>vbc2.exe</VbcToolExe>
   </PropertyGroup>
-</Project>" >packages/Microsoft.Net.ToolsetCompilers.0.7.4092303-beta/build/Microsoft.Net.ToolsetCompilers.props
+</Project>" >packages/Microsoft.Net.ToolsetCompilers.0.7.4100302-beta/build/Microsoft.Net.ToolsetCompilers.props
 xbuild /p:Configuration=Debug Src/Compilers/CSharp/csc/csc.csproj
-xbuild /p:Configuration=Debug Src/Workspaces/CSharp/CSharpWorkspace.csproj
+xbuild /p:Configuration=Debug Src/Workspaces/CSharp/Portable/CSharpWorkspace.csproj
