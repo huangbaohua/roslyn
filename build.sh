@@ -11,5 +11,6 @@ echo "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/dev
   </PropertyGroup>
 </Project>" >$TOOLSET_DIR/Microsoft.Net.ToolsetCompilers.props
 xbuild Src/Tools/Source/FakeSign/FakeSign.csproj
+mono Src/.nuget/NuGet.exe restore Src/Roslyn.sln
 xbuild /p:Configuration=Debug Src/Compilers/CSharp/csc/csc.csproj
 xbuild /p:Configuration=Debug ./Src/Workspaces/CSharp/Desktop/CSharpWorkspace.Desktop.csproj
